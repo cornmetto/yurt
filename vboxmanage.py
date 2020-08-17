@@ -1,5 +1,6 @@
 import os
 from subprocess import check_output, CalledProcessError
+import logging
 
 
 class VBoxManage:
@@ -8,6 +9,11 @@ class VBoxManage:
     class __VBoxManage:
         def __init__(self):
             self.executable = self.getVBoxManagePathWindows()
+
+        def list(self, args: str):
+            cmd = "list {0}".format(args)
+            output = self._run(cmd)
+            return output
 
         def getVBoxManagePathWindows(self):
             baseDirs = []
@@ -37,13 +43,7 @@ class VBoxManage:
             try:
                 return check_output(fullCmd, text=True)
             except CalledProcessError as e:
-                # TODO_122
-                print(e)
-
-        def list(self, args: str):
-            cmd = "list {0}".format(args)
-            output = self._run(cmd)
-            print(output)
+                logging.error(e)
 
         def __repr__(self):
             return "VBoxManage Executable: {0}".format(self.executable)
