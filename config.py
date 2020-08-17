@@ -1,0 +1,83 @@
+import os
+import logging
+import json
+from enum import Enum
+
+
+class ConfigName(Enum):
+    vmName = 1
+    vmUuid = 2
+
+
+class ConfigReadError(Exception):
+    def __init__(self, message):
+        self.message = message
+
+
+class ConfigWriteError(Exception):
+    def __init__(self, message):
+        self.message = message
+
+
+class Config:
+    def __init__(self):
+        applicationName = "cde"
+        configDir = os.path.join(os.environ.get(
+            'HOME'), ".{0}".format(applicationName))
+        configFile = os.path.join(configDir, 'config.json')
+
+        self.applicationName = applicationName
+        self.configDir = configDir
+        self.configFile = configFile
+
+        self._ensureConfigFileExists()
+
+        logging.debug('Using config %s', self.configFile)
+
+    def _ensureConfigFileExists(self):
+        if not os.path.isdir(self.configDir):
+            os.makedirs(self.configDir)
+
+        if not os.path.isfile(self.configFile):
+            with open(self.configFile, 'w') as f:
+                f.write('{}')
+
+    def _readConfig(self):
+        try:
+            with open(self.configFile, 'r') as f:
+                return json.load(f)
+        except FileNotFoundError:
+            msg = 'Config file not found'
+            logging.error(msg)
+            raise ConfigReadError(msg)
+        except json.JSONDecodeError:
+            msg = 'Malformed config file: {0}'.format(self.configFile)
+            logging.error(msg)
+            raise ConfigReadError(msg)
+
+    def _writeConfig(self, config):
+        try:
+            with open(self.configFile, 'w') as f:
+                json.dump(config, f)
+        except Exception as e:
+            logging.error("Error writing config: {0}".format(e))
+            raise ConfigWriteError(e)
+
+    def get(self, configName: ConfigName):
+        config = self._readConfig()
+        if config:
+            return config.get(configName.name, None)
+
+    def set(self, configName: ConfigName, value: str):
+        old = self._readConfig()
+
+        if old is None:
+            return
+
+        new = old.copy()
+        new[configName.name] = value
+
+        try:
+            self._writeConfig(new)
+        except ConfigWriteError:
+            self._writeConfig(old)
