@@ -20,11 +20,10 @@ class ConfigWriteError(Exception):
 
 
 class Config:
-    def __init__(self):
-        applicationName = "cde"
+    def __init__(self, applicationName="cde", fileName="config.json"):
         configDir = os.path.join(os.environ.get(
             'HOME'), ".{0}".format(applicationName))
-        configFile = os.path.join(configDir, 'config.json')
+        configFile = os.path.join(configDir, fileName)
 
         self.applicationName = applicationName
         self.configDir = configDir
@@ -81,3 +80,8 @@ class Config:
             self._writeConfig(new)
         except ConfigWriteError:
             self._writeConfig(old)
+
+
+class TestConfig(Config):
+    def __init__(self):
+        super().__init__(fileName="testConfig.json")
