@@ -1,6 +1,12 @@
 import os
 from subprocess import check_output, CalledProcessError
 import logging
+import re
+
+
+class VBoxManageError(Exception):
+    def __init__(self, message):
+        self.message = message
 
 
 class VBoxManage:
@@ -10,10 +16,45 @@ class VBoxManage:
         def __init__(self):
             self.executable = self.getVBoxManagePathWindows()
 
-        def list(self, args: str):
+        def _list(self, args: str):
             cmd = "list {0}".format(args)
-            output = self._run(cmd)
-            return output
+            return self._run(cmd)
+
+        # Return Id ???
+        def importVm(self, vmName, applianceFile, baseFolder):
+            settingsFile = os.path.join(baseFolder, "{}.vbox".format(vmName))
+            memory = 2048
+
+            cmd = " ".join([
+                "import {0}".format(applianceFile),
+                "--vsys 0 --vmname {0}".format(vmName),
+                "--vsys 0 --settingsfile {0}".format(settingsFile),
+                "--vsys 0 --basefolder {0}".format(baseFolder),
+                "--vsys 0 --memory {0}".format(memory),
+            ])
+
+            self._run(cmd)
+
+        def listVms(self):
+            def parseLine(line):
+                match = re.search(r'"(.*)" \{(.*)\}', line)
+                return match.groups()
+
+            output = self._list("vms").strip()
+            vmList = [(vmName, vmId)
+                      for vmName, vmId in map(parseLine, output.split('\n'))]
+            return vmList
+
+        def vmInfo(self, vmName):
+            cmd = "showvminfo {0} --machinereadable".format(vmName)
+            try:
+                return self._run(cmd)
+            except VBoxManageError:
+                logging.info("VM {0} not found".format(vmName))
+
+        def destroyVm(self, vmName):
+            cmd = "unregistervm --delete {0}".format(vmName)
+            self._run(cmd)
 
         def getVBoxManagePathWindows(self):
             baseDirs = []
@@ -40,10 +81,14 @@ class VBoxManage:
 
         def _run(self, cmd: str):
             fullCmd = "{0} -q {1}".format(self.executable, cmd)
+            output = ""
             try:
-                return check_output(fullCmd, text=True)
+                output = check_output(fullCmd, text=True)
+                return output
             except CalledProcessError as e:
-                logging.error(e)
+                logging.debug(output)
+                logging.debug(e)
+                raise VBoxManageError("{0} failed".format(cmd))
 
         def __repr__(self):
             return "VBoxManage Executable: {0}".format(self.executable)

@@ -6,7 +6,6 @@ from enum import Enum
 
 class ConfigName(Enum):
     vmName = 1
-    vmUuid = 2
 
 
 class ConfigReadError(Exception):
@@ -20,7 +19,7 @@ class ConfigWriteError(Exception):
 
 
 class Config:
-    def __init__(self, applicationName="cde", fileName="config.json"):
+    def __init__(self, applicationName="cde", fileName="config.json", vmInstallDir="vm"):
         configDir = os.path.join(os.environ.get(
             'HOME'), ".{0}".format(applicationName))
         configFile = os.path.join(configDir, fileName)
@@ -32,6 +31,14 @@ class Config:
         self._ensureConfigFileExists()
 
         logging.debug('Using config %s', self.configFile)
+
+        # Constants. ############################################
+        self.artifactsDir = os.path.join(
+            os.path.dirname(__file__), "artifacts")
+        self.vmInstallDir = os.path.join(configDir, vmInstallDir)
+        self.applianceVersion = "0.0.0"
+
+        #########################################################
 
     def _ensureConfigFileExists(self):
         if not os.path.isdir(self.configDir):
@@ -81,7 +88,11 @@ class Config:
         except ConfigWriteError:
             self._writeConfig(old)
 
+    def clear(self):
+        logging.debug("Clearing config")
+        self._writeConfig({})
+
 
 class TestConfig(Config):
     def __init__(self):
-        super().__init__(fileName="testConfig.json")
+        super().__init__(fileName="testConfig.json", vmInstallDir="vm-test")
