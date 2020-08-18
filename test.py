@@ -7,31 +7,34 @@ from core.vm import VM
 
 logging.basicConfig(format='%(levelname)s: %(message)s', level="INFO")
 
+config = TestConfig()
 
-class VMLifeCycle(unittest.TestCase):
 
-    def setUp(self):
-        self.config = TestConfig()
-        self.vm = VM(self.config)
+class SmokeTest(unittest.TestCase):
 
-    def test_init_destroy(self):
-        self.vm.init()
-
-        logging.info("Waiting for VM to be registered")
+    @classmethod
+    def setUpClass(cls):
+        vm = VM(config)
+        vm.init()
+        logging.info("Waiting for VM to be registered...")
         time.sleep(3)
-        self.assertTrue(self.vm.isInitialized())
-
-        self.vm.destroy()
-
-        logging.info("Waiting for VM to be unregistered")
-        time.sleep(3)
-        self.assertFalse(self.vm.isInitialized())
 
     def test_start(self):
-        pass
+        vm = VM(config)
 
-    def test_stop(self):
-        pass
+        vm.start()
+
+        timeOut = 30
+        retryStep = 5
+        while timeOut > 0:
+            if vm.isRunning():
+                break
+            logging.info(
+                "Not running. Retrying in {0} seconds...".format(retryStep))
+            time.sleep(retryStep)
+            timeOut -= retryStep
+
+        self.assertTrue(vm.isRunning())
 
 
 if __name__ == '__main__':

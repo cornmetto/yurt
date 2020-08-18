@@ -40,17 +40,24 @@ class VBoxManage:
                 match = re.search(r'"(.*)" \{(.*)\}', line)
                 return match.groups()
 
-            output = self._list("vms").strip()
+            output = self._list("vms")
             vmList = [(vmName, vmId)
-                      for vmName, vmId in map(parseLine, output.split('\n'))]
+                      for vmName, vmId in map(parseLine, output.splitlines())]
             return vmList
 
         def vmInfo(self, vmName):
             cmd = "showvminfo {0} --machinereadable".format(vmName)
-            try:
-                return self._run(cmd)
-            except VBoxManageError:
-                logging.info("VM {0} not found".format(vmName))
+            output = self._run(cmd)
+            infoList = map(lambda l: l.split("=", 1), output.splitlines())
+            return dict(infoList)
+
+        def startVm(self, vmName):
+            cmd = "startvm {0} --type headless".format(vmName)
+            self._run(cmd)
+
+        def stopVm(self, vmName):
+            cmd = "controlvm {0} acpipowerbutton".format(vmName)
+            self._run(cmd)
 
         def destroyVm(self, vmName):
             cmd = "unregistervm --delete {0}".format(vmName)

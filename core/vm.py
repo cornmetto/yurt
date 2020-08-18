@@ -14,13 +14,21 @@ class VM:
 
     def isInitialized(self):
         if self.vmName:
-            vmInfo = self.vbox.vmInfo(self.vmName)
-            if not vmInfo:
+            try:
+                self.vbox.vmInfo(self.vmName)
+                return True
+            except VBoxManageError:
                 logging.error(
                     "Inconsistent environment. VM Name in config does not exist.")
                 return False
-            return True
         return False
+
+    def isRunning(self):
+        try:
+            vmInfo = self.vbox.vmInfo(self.vmName)
+            return vmInfo["VMState"].strip('"') == "running"
+        except:
+            return False
 
     def init(self):
         config = self.config
@@ -45,10 +53,18 @@ class VM:
                 config.clear()
 
     def start(self):
-        pass
+        if self.isRunning():
+            logging.info("{0} is already running".format(
+                self.config.applicationName))
+        else:
+            self.vbox.startVm(self.vmName)
 
     def stop(self):
-        pass
+        if self.isRunning():
+            self.vbox.stopVm(self.vmName)
+        else:
+            logging.info("{0} is already stopped".format(
+                self.config.applicationName))
 
     def destroy(self):
         if self.isInitialized():

@@ -1,0 +1,6 @@
+from core.vboxmanage import VBoxManage
+from core.vm import VM
+from config import TestConfig
+
+vbox = VBoxManage()
+vm = VM(TestConfig())
