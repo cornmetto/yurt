@@ -6,6 +6,7 @@ from enum import Enum
 
 class ConfigName(Enum):
     vmName = 1
+    hostOnlyInterface = 2
 
 
 class ConfigReadError(Exception):
@@ -19,7 +20,7 @@ class ConfigWriteError(Exception):
 
 
 class Config:
-    def __init__(self, applicationName="cde", fileName="config.json", vmInstallDir="vm"):
+    def __init__(self, applicationName="yurt", fileName="config.json", vmInstallDir="vm"):
         configDir = os.path.join(os.environ.get(
             'HOME'), ".{0}".format(applicationName))
         configFile = os.path.join(configDir, fileName)
@@ -87,6 +88,7 @@ class Config:
             self._writeConfig(new)
         except ConfigWriteError:
             self._writeConfig(old)
+            raise ConfigWriteError
 
     def clear(self):
         logging.debug("Clearing config")

@@ -3,7 +3,7 @@ import uuid
 import os
 
 from .vboxmanage import VBoxManage, VBoxManageError
-from config import ConfigName, ConfigReadError
+from config import ConfigName, ConfigReadError, ConfigWriteError
 
 
 class VM:
@@ -19,7 +19,7 @@ class VM:
                 return True
             except VBoxManageError:
                 logging.error(
-                    "Inconsistent environment. VM Name in config does not exist.")
+                    "Inconsistent environment.")
                 return False
         return False
 
@@ -27,8 +27,9 @@ class VM:
         try:
             vmInfo = self.vbox.vmInfo(self.vmName)
             return vmInfo["VMState"].strip('"') == "running"
-        except:
-            return False
+        except (VBoxManageError, KeyError):
+            logging.error(
+                "An error occurred while trying to determine status.")
 
     def init(self):
         config = self.config
@@ -40,37 +41,75 @@ class VM:
                 config.applicationName))
             logging.info(
                 "If you need to start over, destroy the existing environment first.")
-        else:
-            vmName = "{0}-{1}".format(config.applicationName, uuid.uuid4())
-            self.vmName = vmName
+            return
+
+        vmName = "{0}-{1}".format(config.applicationName, uuid.uuid4())
+        self.vmName = vmName
+
+        try:
             config.set(ConfigName.vmName, vmName)
-            try:
-                self.vbox.importVm(
-                    vmName, applianceFile, config.vmInstallDir)
-            except VBoxManageError as e:
-                logging.debug(e)
-                logging.error("Initialization failed")
-                config.clear()
+            self.vbox.importVm(
+                vmName, applianceFile, config.vmInstallDir)
+            self._initializeNetwork()
+        except:
+            logging.error("Initialization failed")
+            self.destroy(force=True)
+
+    def _initializeNetwork(self):
+        try:
+            interfaceName = self.vbox.createHostOnlyInterface()
+            self.config.set(ConfigName.hostOnlyInterface, interfaceName)
+
+            quotedInterfaceName = '"{}"'.format(interfaceName)
+            self.vbox.modifyVm(self.vmName,
+                               {
+                                   'nic1': 'nat',
+                                   'nictype1': 'virtio',
+                                   'nic2': 'hostonly',
+                                   'nictype2': 'virtio',
+                                   'hostonlyadapter2': quotedInterfaceName
+                               })
+
+        except (VBoxManageError, ConfigWriteError):
+            msg = "Network initialization failed"
+            logging.error(msg)
+            raise VBoxManageError(msg)
 
     def start(self):
         if self.isRunning():
             logging.info("{0} is already running".format(
                 self.config.applicationName))
-        else:
+            return
+
+        try:
             self.vbox.startVm(self.vmName)
+        except VBoxManageError:
+            logging.error("Start up failed")
 
     def stop(self):
-        if self.isRunning():
-            self.vbox.stopVm(self.vmName)
-        else:
+        if not self.isRunning():
             logging.info("{0} is already stopped".format(
                 self.config.applicationName))
+            return
 
-    def destroy(self):
-        if self.isInitialized():
+        try:
+            self.vbox.stopVm(self.vmName)
+        except VBoxManageError:
+            logging.error("Shut down failed")
+
+    def destroy(self, force=False):
+        if not self.isInitialized() and not force:
+            logging.warning(
+                "{0} is not initialized".format(self.config.applicationName))
+            return
+
+        try:
             self.vbox.destroyVm(self.vmName)
+            interfaceName = self.config.get(ConfigName.hostOnlyInterface)
+            self.vbox.removeHostOnlyInterface(interfaceName)
+
             self.config.clear()
             self.vmName = None
-        else:
-            logging.warning(
-                "Attempting to destroy an uninitialized environment")
+        except VBoxManageError:
+            logging.error("Failed to destroy {0} environment.".format(
+                self.config.applicationName))

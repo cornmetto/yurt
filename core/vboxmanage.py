@@ -2,6 +2,7 @@ import os
 from subprocess import check_output, CalledProcessError
 import logging
 import re
+from typing import Dict
 
 
 class VBoxManageError(Exception):
@@ -35,6 +36,15 @@ class VBoxManage:
 
             self._run(cmd)
 
+        def modifyVm(self, vmName, settings: Dict[str, str]):
+            options = map(
+                lambda option: "--{0} {1}".format(option[0], option[1]),
+                settings.items())
+
+            cmd = "modifyvm {0} {1}".format(vmName, " ".join(options))
+
+            self._run(cmd)
+
         def listVms(self):
             def parseLine(line):
                 match = re.search(r'"(.*)" \{(.*)\}', line)
@@ -45,21 +55,43 @@ class VBoxManage:
                       for vmName, vmId in map(parseLine, output.splitlines())]
             return vmList
 
-        def vmInfo(self, vmName):
+        def listHostOnlyInterfaces(self):
+            def getIfaceName(line):
+                match = re.search(r"^Name: +(.*)", line)
+                if match:
+                    return match.group(1)
+
+            interfaces = map(getIfaceName, self._run(
+                "list hostonlyifs").splitlines())
+            return list(filter(None, interfaces))
+
+        def vmInfo(self, vmName: str):
             cmd = "showvminfo {0} --machinereadable".format(vmName)
             output = self._run(cmd)
             infoList = map(lambda l: l.split("=", 1), output.splitlines())
             return dict(infoList)
 
-        def startVm(self, vmName):
+        def startVm(self, vmName: str):
             cmd = "startvm {0} --type headless".format(vmName)
             self._run(cmd)
 
-        def stopVm(self, vmName):
+        def stopVm(self, vmName: str):
             cmd = "controlvm {0} acpipowerbutton".format(vmName)
             self._run(cmd)
 
-        def destroyVm(self, vmName):
+        def createHostOnlyInterface(self):
+            oldInterfaces = set(self.listHostOnlyInterfaces())
+            self._run("hostonlyif create")
+            newInterfaces = set(self.listHostOnlyInterfaces())
+            try:
+                return newInterfaces.difference(oldInterfaces).pop()
+            except KeyError:
+                logging.error("Host-Only interface not properly initialized")
+
+        def removeHostOnlyInterface(self, interfaceName: str):
+            self._run('hostonlyif remove "{0}"'.format(interfaceName))
+
+        def destroyVm(self, vmName: str):
             cmd = "unregistervm --delete {0}".format(vmName)
             self._run(cmd)
 
@@ -95,7 +127,9 @@ class VBoxManage:
             except CalledProcessError as e:
                 logging.debug(output)
                 logging.debug(e)
-                raise VBoxManageError("{0} failed".format(cmd))
+                msg = "{0} failed".format(cmd)
+                logging.error(msg)
+                raise VBoxManageError(msg)
 
         def __repr__(self):
             return "VBoxManage Executable: {0}".format(self.executable)
