@@ -1,6 +1,7 @@
 import logging
 import uuid
 import os
+import time
 
 from .vboxmanage import VBoxManage, VBoxManageError
 from config import ConfigName, ConfigReadError, ConfigWriteError
@@ -65,6 +66,8 @@ class VM:
                                {
                                    'nic1': 'nat',
                                    'nictype1': 'virtio',
+                                   'natnet1': '10.0.2.0/24',
+                                   "natdnshostresolver1": "on",
                                    'nic2': 'hostonly',
                                    'nictype2': 'virtio',
                                    'hostonlyadapter2': quotedInterfaceName
@@ -82,8 +85,19 @@ class VM:
             return
 
         try:
+            logging.info("{0} is starting up...".format(
+                self.config.applicationName))
             self.vbox.startVm(self.vmName)
-        except VBoxManageError:
+            time.sleep(2)
+            logging.info("Setting up network...")
+            time.sleep(8)
+            hostSSHPort = self.vbox.setUpNATPortForwarding(
+                self.vmName, self.config)
+            self.config.set(ConfigName.hostSSHPort, hostSSHPort)
+
+        # TODO: Error inheritance for uniform handling.
+        except (VBoxManageError, ConfigWriteError) as e:
+            logging.error(e.message)
             logging.error("Start up failed")
 
     def stop(self):

@@ -3,6 +3,10 @@ from subprocess import check_output, CalledProcessError
 import logging
 import re
 from typing import Dict
+import random
+import time
+
+from .utils import isSSHAvailableOnPort
 
 
 class VBoxManageError(Exception):
@@ -28,6 +32,7 @@ class VBoxManage:
 
             cmd = " ".join([
                 "import {0}".format(applianceFile),
+                "--options keepnatmacs",
                 "--vsys 0 --vmname {0}".format(vmName),
                 "--vsys 0 --settingsfile {0}".format(settingsFile),
                 "--vsys 0 --basefolder {0}".format(baseFolder),
@@ -79,6 +84,44 @@ class VBoxManage:
             cmd = "controlvm {0} acpipowerbutton".format(vmName)
             self._run(cmd)
 
+        def setUpNATPortForwarding(self, vmName: str, config):
+            retryCount, retryWaitTime = (5, 7)
+            lowPort, highPort = (4022, 4099)
+            hostPort = lowPort
+            connected = isSSHAvailableOnPort(hostPort, config)
+
+            while (retryCount > 0) and not connected:
+                addRuleCmd = 'controlvm {0} natpf1 "ssh,tcp,,{1},,22"'.format(
+                    vmName, hostPort)
+                removeRuleCmd = 'controlvm {0} natpf1 delete ssh'.format(
+                    vmName)
+
+                logging.debug(
+                    "Attempting to forward SSH on port {0}...".format(hostPort))
+                try:
+                    self._run(removeRuleCmd)
+                except:
+                    pass
+
+                try:
+                    self._run(addRuleCmd)
+                    time.sleep(2)  # Give it time.
+                    connected = isSSHAvailableOnPort(hostPort, config)
+                    if not connected:
+                        hostPort = random.randrange(lowPort, highPort)
+                        retryCount -= 1
+                        time.sleep(retryWaitTime)
+
+                except VBoxManageError:
+                    raise VBoxManageError(
+                        "An error occurred while setting up SSH")
+
+            if connected:
+                return hostPort
+            else:
+                raise VBoxManageError(
+                    "Failed to set up SSH port forwarding")
+
         def createHostOnlyInterface(self):
             oldInterfaces = set(self.listHostOnlyInterfaces())
             self._run("hostonlyif create")
@@ -128,7 +171,7 @@ class VBoxManage:
                 logging.debug(output)
                 logging.debug(e)
                 msg = "{0} failed".format(cmd)
-                logging.error(msg)
+                logging.debug(msg)
                 raise VBoxManageError(msg)
 
         def __repr__(self):

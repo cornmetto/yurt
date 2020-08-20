@@ -7,6 +7,7 @@ from enum import Enum
 class ConfigName(Enum):
     vmName = 1
     hostOnlyInterface = 2
+    hostSSHPort = 3
 
 
 class ConfigReadError(Exception):
@@ -34,10 +35,19 @@ class Config:
         logging.debug('Using config %s', self.configFile)
 
         # Constants. ############################################
+        self.applianceVersion = "0.0.2"
+
+        # Paths
+        provisionDir = os.path.join(
+            os.path.dirname(__file__), "provision")
         self.artifactsDir = os.path.join(
             os.path.dirname(__file__), "artifacts")
         self.vmInstallDir = os.path.join(configDir, vmInstallDir)
-        self.applianceVersion = "0.0.0"
+        self.SSHUserName = "yurt"
+        self.SSHPrivateKeyFile = os.path.join(
+            provisionDir, ".ssh", "id_rsa_yurt")
+        self.SSHHostKeysFile = os.path.join(
+            configDir, "known_hosts")
 
         #########################################################
 
