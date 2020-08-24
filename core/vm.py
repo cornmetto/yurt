@@ -4,6 +4,7 @@ import os
 import time
 
 from .vboxmanage import VBoxManage, VBoxManageError
+from .lxd import LXD, LXDError
 from config import ConfigName, ConfigReadError, ConfigWriteError
 
 
@@ -11,6 +12,7 @@ class VM:
     def __init__(self, config):
         self.config = config
         self.vbox = VBoxManage()
+        self.lxd = LXD()
         self.vmName = self.config.get(ConfigName.vmName)
 
     def isInitialized(self):
@@ -32,10 +34,14 @@ class VM:
             logging.error(
                 "An error occurred while trying to determine status.")
 
-    def init(self):
+    def init(self, applianceVersion=None):
         config = self.config
+
+        if not applianceVersion:
+            applianceVersion = config.applianceVersion
+
         applianceFile = os.path.join(self.config.artifactsDir,
-                                     "{0}-{1}.ova".format(config.applicationName, config.applianceVersion))
+                                     "{0}-{1}.ova".format(config.applicationName, applianceVersion))
 
         if self.isInitialized():
             logging.info("{0} has already been initialized.".format(
@@ -70,7 +76,8 @@ class VM:
                                    "natdnshostresolver1": "on",
                                    'nic2': 'hostonly',
                                    'nictype2': 'virtio',
-                                   'hostonlyadapter2': quotedInterfaceName
+                                   'hostonlyadapter2': quotedInterfaceName,
+                                   'nicpromisc2': 'allow-all'
                                })
 
         except (VBoxManageError, ConfigWriteError):
@@ -90,13 +97,14 @@ class VM:
             self.vbox.startVm(self.vmName)
             time.sleep(2)
             logging.info("Setting up network...")
-            time.sleep(8)
+            time.sleep(10)
             hostSSHPort = self.vbox.setUpNATPortForwarding(
                 self.vmName, self.config)
             self.config.set(ConfigName.hostSSHPort, hostSSHPort)
+            self.lxd.setUp()
 
         # TODO: Error inheritance for uniform handling.
-        except (VBoxManageError, ConfigWriteError) as e:
+        except (VBoxManageError, ConfigWriteError, LXDError) as e:
             logging.error(e.message)
             logging.error("Start up failed")
 

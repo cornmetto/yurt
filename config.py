@@ -35,7 +35,7 @@ class Config:
         logging.debug('Using config %s', self.configFile)
 
         # Constants. ############################################
-        self.applianceVersion = "0.0.2"
+        self.applianceVersion = "0.1.3"
 
         # Paths
         provisionDir = os.path.join(

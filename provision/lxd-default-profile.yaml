@@ -1,0 +1,13 @@
+config: {}
+description: Default LXD profile
+devices:
+  eth0:
+    name: eth0
+    nictype: bridged
+    parent: yurtnet
+    type: nic
+  root:
+    path: /
+    pool: yurt
+    type: disk
+name: default

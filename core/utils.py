@@ -3,6 +3,8 @@ from paramiko.ssh_exception import SSHException
 import socket
 import logging
 import os
+import requests
+import shutil
 
 
 def isSSHAvailableOnPort(port, config):
@@ -26,3 +28,9 @@ def isSSHAvailableOnPort(port, config):
         logging.debug("SSH probe failed with unknown error")
 
     return False
+
+
+def downloadFile(url, destination):
+    with requests.get(url, stream=True) as r:
+        with open(destination, 'wb') as f:
+            shutil.copyfileobj(r.raw, f)
