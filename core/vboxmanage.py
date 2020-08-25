@@ -5,6 +5,7 @@ import re
 from typing import Dict
 import random
 import time
+from functools import reduce
 
 from .utils import isSSHAvailableOnPort, isLXDAvailableOnPort
 from config import ConfigName
@@ -61,17 +62,7 @@ class VBoxManage:
                       for vmName, vmId in map(parseLine, output.splitlines())]
             return vmList
 
-        def listHostOnlyInterfaces(self):
-            def getIfaceName(line):
-                match = re.search(r"^Name: +(.*)", line)
-                if match:
-                    return match.group(1)
-
-            interfaces = map(getIfaceName, self._run(
-                "list hostonlyifs").splitlines())
-            return list(filter(None, interfaces))
-
-        def vmInfo(self, vmName: str):
+        def getVmInfo(self, vmName: str):
             cmd = "showvminfo {0} --machinereadable".format(vmName)
             output = self._run(cmd)
             infoList = map(lambda l: l.split("=", 1), output.splitlines())
@@ -94,8 +85,8 @@ class VBoxManage:
             return self._setUpPortForwarding(vmName, config, "lxd", currentHostPort, 8443, isLXDAvailableOnPort)
 
         def _setUpPortForwarding(self, vmName: str, config,
-                ruleName, initialHostPort, guestPort, isServiceAvailableOnPort
-            ):
+                                 ruleName, initialHostPort, guestPort, isServiceAvailableOnPort
+                                 ):
 
             retryCount, retryWaitTime = (5, 7)
             lowPort, highPort = (4000, 4099)
@@ -134,6 +125,43 @@ class VBoxManage:
                 raise VBoxManageError(
                     "Set up forwarding {0},{1}:{2} but service \
                      in guest does not appear to be available.".format(ruleName, hostPort, guestPort))
+
+        def listHostOnlyInterfaces(self):
+            def getIfaceName(line):
+                match = re.search(r"^Name: +(.*)", line)
+                if match:
+                    return match.group(1)
+
+            interfaces = map(getIfaceName, self._run(
+                "list hostonlyifs").splitlines())
+            return list(filter(None, interfaces))
+
+        def getInterfaceInfo(self, interfaceName):
+            lines = self._run("list hostonlyifs").splitlines()
+
+            interfaceInfo = {}
+            processingInterfaceValues = False
+            for line in lines:
+                match = re.search(r"^Name: +{}$".format(interfaceName), line)
+                if match:
+                    processingInterfaceValues = True
+
+                try:
+                    if processingInterfaceValues:
+                        if len(line) == 0:
+                            return interfaceInfo
+                        key, value = line.split(":", 1)
+                        key, value = key.strip(), value.strip()
+                        interfaceInfo[key] = value
+
+                except ValueError as e:
+                    logging.error(
+                        "Error processing line {0}: {1}".format(line, e))
+                    raise VBoxManageError(
+                        "Unexpected result from 'list hostonlyifs'")
+
+            raise VBoxManageError(
+                "Interface {} not found".format(interfaceName))
 
         def createHostOnlyInterface(self):
             oldInterfaces = set(self.listHostOnlyInterfaces())

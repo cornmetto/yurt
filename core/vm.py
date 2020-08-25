@@ -18,7 +18,7 @@ class VM:
     def isInitialized(self):
         if self.vmName:
             try:
-                self.vbox.vmInfo(self.vmName)
+                self.vbox.getVmInfo(self.vmName)
                 return True
             except VBoxManageError:
                 logging.error(
@@ -28,7 +28,7 @@ class VM:
 
     def isRunning(self):
         try:
-            vmInfo = self.vbox.vmInfo(self.vmName)
+            vmInfo = self.vbox.getVmInfo(self.vmName)
             return vmInfo["VMState"].strip('"') == "running"
         except (VBoxManageError, KeyError):
             logging.error(
@@ -88,11 +88,13 @@ class VM:
     def start(self):
         config = self.config
         if self.isRunning():
-            logging.info("{0} is already running".format(config.applicationName))
+            logging.info("{0} is already running".format(
+                config.applicationName))
             return
 
         try:
-            logging.info("{0} is starting up...".format(config.applicationName))
+            logging.info("{0} is starting up...".format(
+                config.applicationName))
             self.vbox.startVm(self.vmName)
             time.sleep(2)
             logging.info("Setting up network...")
@@ -104,7 +106,7 @@ class VM:
                 self.vmName, config)
             config.set(ConfigName.hostSSHPort, hostSSHPort)
             config.set(ConfigName.hostLXDPort, hostLXDPort)
-            
+
             self.lxd = LXD(config)
             self.lxd.setUp()
 
