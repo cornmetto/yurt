@@ -8,6 +8,7 @@ class ConfigName(Enum):
     vmName = 1
     hostOnlyInterface = 2
     hostSSHPort = 3
+    hostLXDPort = 4
 
 
 class ConfigReadError(Exception):
@@ -21,7 +22,15 @@ class ConfigWriteError(Exception):
 
 
 class Config:
-    def __init__(self, applicationName="yurt", fileName="config.json", vmInstallDir="vm"):
+    def __init__(self, applicationName="yurt", env="prod"):
+
+        if env == "prod":
+            fileName = "config.json"
+            vmInstallDir = "vm"
+        else:
+            fileName = "testConfig.json"
+            vmInstallDir = "vm-test"
+
         configDir = os.path.join(os.environ.get(
             'HOME'), ".{0}".format(applicationName))
         configFile = os.path.join(configDir, fileName)
@@ -48,6 +57,8 @@ class Config:
             provisionDir, ".ssh", "id_rsa_yurt")
         self.SSHHostKeysFile = os.path.join(
             configDir, "known_hosts")
+        self.LXDTLSKey = os.path.join(provisionDir, ".tls", "client.key")
+        self.LXDTLSCert = os.path.join(provisionDir, ".tls", "client.crt")
 
         #########################################################
 
@@ -103,8 +114,3 @@ class Config:
     def clear(self):
         logging.debug("Clearing config")
         self._writeConfig({})
-
-
-class TestConfig(Config):
-    def __init__(self):
-        super().__init__(fileName="testConfig.json", vmInstallDir="vm-test")

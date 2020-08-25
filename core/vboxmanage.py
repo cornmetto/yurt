@@ -84,7 +84,10 @@ class VBoxManage:
             cmd = "controlvm {0} acpipowerbutton".format(vmName)
             self._run(cmd)
 
-        def setUpNATPortForwarding(self, vmName: str, config):
+        def setUpLXDPortForwarding(self, vmName: str, config):
+            raise VBoxManageError("setUpLXDPortForwarding: not implemented")
+
+        def setUpSSHPortForwarding(self, vmName: str, config):
             retryCount, retryWaitTime = (5, 7)
             lowPort, highPort = (4022, 4099)
             hostPort = lowPort

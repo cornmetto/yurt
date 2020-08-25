@@ -12,7 +12,6 @@ class VM:
     def __init__(self, config):
         self.config = config
         self.vbox = VBoxManage()
-        self.lxd = LXD()
         self.vmName = self.config.get(ConfigName.vmName)
 
     def isInitialized(self):
@@ -98,12 +97,15 @@ class VM:
             time.sleep(2)
             logging.info("Setting up network...")
             time.sleep(10)
-            hostSSHPort = self.vbox.setUpNATPortForwarding(
+            hostSSHPort = self.vbox.setUpSSHPortForwarding(
+                self.vmName, self.config)
+            hostLXDPort = self.vbox.setUpLXDPortForwarding(
                 self.vmName, self.config)
             self.config.set(ConfigName.hostSSHPort, hostSSHPort)
-            self.lxd.setUp()
+            self.config.set(ConfigName.hostLXDPort, hostLXDPort)
+            lxd = LXD(hostLXDPort)
+            lxd.setUp()
 
-        # TODO: Error inheritance for uniform handling.
         except (VBoxManageError, ConfigWriteError, LXDError) as e:
             logging.error(e.message)
             logging.error("Start up failed")

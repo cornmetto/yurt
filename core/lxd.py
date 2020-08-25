@@ -1,4 +1,5 @@
 import logging
+from pylxd import Client
 
 
 class LXDError(Exception):
@@ -7,14 +8,18 @@ class LXDError(Exception):
 
 
 class LXD:
-    def __init__(self):
-        pass
+    def __init__(self, config):
+        self.client = Client(
+            endpoint="https://localhost:{}".format(4084),
+            cert=(config.LXDTLSCert, config.LXDTLSKey),
+            verify=False
+        )
 
     def setUp(self):
-        self._setUpNetwork()
+        self._setUpContainerNetwork()
         self._setUpProfile()
 
-    def _setUpNetwork(self):
+    def _setUpContainerNetwork(self):
         raise LXDError("_setUpNetwork: Not implemented")
 
     def _setUpProfile(self):

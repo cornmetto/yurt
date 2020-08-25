@@ -2,12 +2,14 @@ import logging
 
 from core.vboxmanage import VBoxManage
 from core.vm import VM
-from config import TestConfig
+from core.lxd import LXD
+from config import Config
 from core import utils
 
 logging.basicConfig(
     format='%(name)s-%(levelname)s: %(message)s', level="DEBUG")
 
-config = TestConfig()
+config = Config(env="dev")
 vbox = VBoxManage()
 vm = VM(config)
+lxd = LXD(config)
