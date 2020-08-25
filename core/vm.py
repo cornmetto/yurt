@@ -13,6 +13,7 @@ class VM:
         self.config = config
         self.vbox = VBoxManage()
         self.vmName = self.config.get(ConfigName.vmName)
+        self.lxd = None
 
     def isInitialized(self):
         if self.vmName:
@@ -85,26 +86,27 @@ class VM:
             raise VBoxManageError(msg)
 
     def start(self):
+        config = self.config
         if self.isRunning():
-            logging.info("{0} is already running".format(
-                self.config.applicationName))
+            logging.info("{0} is already running".format(config.applicationName))
             return
 
         try:
-            logging.info("{0} is starting up...".format(
-                self.config.applicationName))
+            logging.info("{0} is starting up...".format(config.applicationName))
             self.vbox.startVm(self.vmName)
             time.sleep(2)
             logging.info("Setting up network...")
             time.sleep(10)
+
             hostSSHPort = self.vbox.setUpSSHPortForwarding(
-                self.vmName, self.config)
+                self.vmName, config)
             hostLXDPort = self.vbox.setUpLXDPortForwarding(
-                self.vmName, self.config)
-            self.config.set(ConfigName.hostSSHPort, hostSSHPort)
-            self.config.set(ConfigName.hostLXDPort, hostLXDPort)
-            lxd = LXD(hostLXDPort)
-            lxd.setUp()
+                self.vmName, config)
+            config.set(ConfigName.hostSSHPort, hostSSHPort)
+            config.set(ConfigName.hostLXDPort, hostLXDPort)
+            
+            self.lxd = LXD(config)
+            self.lxd.setUp()
 
         except (VBoxManageError, ConfigWriteError, LXDError) as e:
             logging.error(e.message)
@@ -134,6 +136,7 @@ class VM:
 
             self.config.clear()
             self.vmName = None
+            self.lxd = None
         except VBoxManageError:
             logging.error("Failed to destroy {0} environment.".format(
                 self.config.applicationName))

@@ -12,4 +12,3 @@ logging.basicConfig(
 config = Config(env="dev")
 vbox = VBoxManage()
 vm = VM(config)
-lxd = LXD(config)

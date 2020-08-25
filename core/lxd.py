@@ -1,6 +1,8 @@
 import logging
 from pylxd import Client
 
+from config import ConfigName
+
 
 class LXDError(Exception):
     def __init__(self, message):
@@ -9,8 +11,12 @@ class LXDError(Exception):
 
 class LXD:
     def __init__(self, config):
+        hostPort = config.get(ConfigName.hostLXDPort)
+        if not hostPort:
+            raise LXDError("LXD Port is not set up properly")
+
         self.client = Client(
-            endpoint="https://localhost:{}".format(4084),
+            endpoint="https://localhost:{}".format(hostPort),
             cert=(config.LXDTLSCert, config.LXDTLSKey),
             verify=False
         )

@@ -6,7 +6,8 @@ from typing import Dict
 import random
 import time
 
-from .utils import isSSHAvailableOnPort
+from .utils import isSSHAvailableOnPort, isLXDAvailableOnPort
+from config import ConfigName
 
 
 class VBoxManageError(Exception):
@@ -84,23 +85,31 @@ class VBoxManage:
             cmd = "controlvm {0} acpipowerbutton".format(vmName)
             self._run(cmd)
 
-        def setUpLXDPortForwarding(self, vmName: str, config):
-            raise VBoxManageError("setUpLXDPortForwarding: not implemented")
-
         def setUpSSHPortForwarding(self, vmName: str, config):
+            currentHostPort = config.get(ConfigName.hostSSHPort)
+            return self._setUpPortForwarding(vmName, config, "ssh", currentHostPort, 22, isSSHAvailableOnPort)
+
+        def setUpLXDPortForwarding(self, vmName: str, config):
+            currentHostPort = config.get(ConfigName.hostLXDPort)
+            return self._setUpPortForwarding(vmName, config, "lxd", currentHostPort, 8443, isLXDAvailableOnPort)
+
+        def _setUpPortForwarding(self, vmName: str, config,
+                ruleName, initialHostPort, guestPort, isServiceAvailableOnPort
+            ):
+
             retryCount, retryWaitTime = (5, 7)
-            lowPort, highPort = (4022, 4099)
-            hostPort = lowPort
-            connected = isSSHAvailableOnPort(hostPort, config)
+            lowPort, highPort = (4000, 4099)
+            hostPort = initialHostPort or lowPort
+            connected = isServiceAvailableOnPort(hostPort, config)
 
             while (retryCount > 0) and not connected:
-                addRuleCmd = 'controlvm {0} natpf1 "ssh,tcp,,{1},,22"'.format(
-                    vmName, hostPort)
-                removeRuleCmd = 'controlvm {0} natpf1 delete ssh'.format(
-                    vmName)
+                addRuleCmd = 'controlvm {0} natpf1 "{1},tcp,,{2},,{3}"'.format(
+                    vmName, ruleName, hostPort, guestPort)
+                removeRuleCmd = 'controlvm {0} natpf1 delete {1}'.format(
+                    vmName, ruleName)
 
                 logging.debug(
-                    "Attempting to forward SSH on port {0}...".format(hostPort))
+                    "Setting up forwarding {0},{1}:{2} ...".format(ruleName, hostPort, guestPort))
                 try:
                     self._run(removeRuleCmd)
                 except:
@@ -109,7 +118,7 @@ class VBoxManage:
                 try:
                     self._run(addRuleCmd)
                     time.sleep(2)  # Give it time.
-                    connected = isSSHAvailableOnPort(hostPort, config)
+                    connected = isServiceAvailableOnPort(hostPort, config)
                     if not connected:
                         hostPort = random.randrange(lowPort, highPort)
                         retryCount -= 1
@@ -123,7 +132,8 @@ class VBoxManage:
                 return hostPort
             else:
                 raise VBoxManageError(
-                    "Failed to set up SSH port forwarding")
+                    "Set up forwarding {0},{1}:{2} but service \
+                     in guest does not appear to be available.".format(ruleName, hostPort, guestPort))
 
         def createHostOnlyInterface(self):
             oldInterfaces = set(self.listHostOnlyInterfaces())

@@ -5,6 +5,7 @@ import logging
 import os
 import requests
 import shutil
+from pylxd import Client
 
 
 def isSSHAvailableOnPort(port, config):
@@ -29,6 +30,18 @@ def isSSHAvailableOnPort(port, config):
 
     return False
 
+
+def isLXDAvailableOnPort(port, config):
+    try:
+        client = Client(
+            endpoint="https://localhost:{}".format(port),
+            cert=(config.LXDTLSCert, config.LXDTLSKey),
+            verify=False
+        )
+        return True
+    except Exception as e:
+        logging.error(e)
+        return False
 
 def downloadFile(url, destination):
     with requests.get(url, stream=True) as r:
