@@ -33,7 +33,7 @@ def isSSHAvailableOnPort(port, config):
 
 def isLXDAvailableOnPort(port, config):
     try:
-        client = Client(
+        Client(
             endpoint="https://localhost:{}".format(port),
             cert=(config.LXDTLSCert, config.LXDTLSKey),
             verify=False
@@ -42,6 +42,7 @@ def isLXDAvailableOnPort(port, config):
     except Exception as e:
         logging.error(e)
         return False
+
 
 def downloadFile(url, destination):
     with requests.get(url, stream=True) as r:

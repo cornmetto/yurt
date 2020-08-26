@@ -7,8 +7,10 @@ from enum import Enum
 class ConfigName(Enum):
     vmName = 1
     hostOnlyInterface = 2
-    hostSSHPort = 3
-    hostLXDPort = 4
+    hostOnlyInterfaceIPAddress = 3
+    hostOnlyInterfaceNetworkMask = 4
+    hostSSHPort = 5
+    hostLXDPort = 6
 
 
 class ConfigReadError(Exception):

@@ -10,5 +10,4 @@ logging.basicConfig(
     format='%(name)s-%(levelname)s: %(message)s', level="DEBUG")
 
 config = Config(env="dev")
-vbox = VBoxManage()
 vm = VM(config)

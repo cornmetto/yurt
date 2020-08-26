@@ -8,12 +8,20 @@ from .lxd import LXD, LXDError
 from config import ConfigName, ConfigReadError, ConfigWriteError
 
 
+class VMError(Exception):
+    def __init__(self, message):
+        self.message = message
+
+
 class VM:
     def __init__(self, config):
         self.config = config
         self.vbox = VBoxManage()
         self.vmName = self.config.get(ConfigName.vmName)
+
         self.lxd = None
+        if self.isInitialized() and self.isRunning():
+            self.lxd = LXD(self.config)
 
     def isInitialized(self):
         if self.vmName:
@@ -65,7 +73,13 @@ class VM:
     def _initializeNetwork(self):
         try:
             interfaceName = self.vbox.createHostOnlyInterface()
+            interfaceInfo = self.vbox.getInterfaceInfo(interfaceName)
+            IPAddress = interfaceInfo['IPAddress']
+            networkMask = interfaceInfo['NetworkMask']
             self.config.set(ConfigName.hostOnlyInterface, interfaceName)
+            self.config.set(ConfigName.hostOnlyInterfaceIPAddress, IPAddress)
+            self.config.set(
+                ConfigName.hostOnlyInterfaceNetworkMask, networkMask)
 
             quotedInterfaceName = '"{}"'.format(interfaceName)
             self.vbox.modifyVm(self.vmName,
@@ -87,6 +101,10 @@ class VM:
 
     def start(self):
         config = self.config
+
+        if not self.isInitialized():
+            raise VMError("VM has not yet been initialized")
+
         if self.isRunning():
             logging.info("{0} is already running".format(
                 config.applicationName))
