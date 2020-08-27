@@ -1,13 +1,45 @@
 import logging
-from pylxd import Client, models
+from pylxd import Client, models, exceptions
 import ipaddress
+import time
+from enum import Enum
+import urllib3
+import os
 
 from config import ConfigName
+
+urllib3.disable_warnings()
 
 
 class LXDError(Exception):
     def __init__(self, message):
         self.message = message
+
+
+class LXDStatusCode(Enum):
+    OperationCreated = 100
+    Started = 101
+    Stopped = 102
+    Running = 103
+    Cancelling = 104
+    Pending = 105
+    Starting = 106
+    Stopping = 107
+    Aborting = 108
+    Freezing = 109
+    Frozen = 110
+    Thawed = 111
+    Success = 200
+    Failure = 400
+    Cancelled = 401
+
+    @staticmethod
+    def get(numericStatusCode):
+        try:
+            return LXDStatusCode(numericStatusCode)
+        except ValueError:
+            logging.error(f"Unexpected status code {numericStatusCode}")
+            return numericStatusCode
 
 
 class LXD:
@@ -80,3 +112,105 @@ class LXD:
         })
 
         defaultProfile.save()
+
+    def _waitForOperationWithConsoleUpdates(self, operationId: str):
+        import random
+        os.environ["PYLXD_WARNINGS"] = "none"
+
+        retry = 3
+        operation = None
+        while operation == None and retry > 0:
+            try:
+                operation = self.client.operations.get(operationId)
+            except exceptions.NotFound:
+                logging.debug(
+                    f"Operation {operationId} not found. Retrying...")
+                time.sleep(3)
+                retry -= 1
+
+        logging.info(operation.description)
+        lastStatusStr = ""
+        while LXDStatusCode.get(operation.status_code) in (
+            LXDStatusCode.OperationCreated,
+            LXDStatusCode.Started,
+            LXDStatusCode.Running,
+            LXDStatusCode.Cancelling,
+            LXDStatusCode.Pending,
+            LXDStatusCode.Starting,
+            LXDStatusCode.Stopping,
+            LXDStatusCode.Aborting,
+            LXDStatusCode.Freezing,
+        ):
+            if operation.metadata:
+                statusStr = ", ".join(
+                    f"{k}: {v}" for k, v in operation.metadata.items())
+                if statusStr != lastStatusStr:
+                    logging.info(f"{statusStr}")
+                    lastStatusStr = statusStr
+
+            time.sleep(random.randrange(5, 10))
+            try:
+                operation = self.client.operations.get(operationId)
+            except exceptions.NotFound:
+                break
+
+        os.environ.pop("PYLXD_WARNINGS")
+
+    def createInstance(self, instanceName: str, server: str, alias: str):
+        # https://linuxcontainers.org/lxd/docs/master/instances
+        # Valid instance names must:
+        #   - Be between 1 and 63 characters long
+        #   - Be made up exclusively of letters, numbers and dashes from the ASCII table
+        #   - Not start with a digit or a dash
+        #   - Not end with a dash
+
+        if server in ("ubuntu", "images", "ubuntu-daily"):
+            serverUrl = {"ubuntu": "https://cloud-images.ubuntu.com/releases",
+                         "ubuntu-daily": "https://cloud-images.ubuntu.com/daily",
+                         "images": "https://images.linuxcontainers.org",
+                         }[server]
+        else:
+            serverUrl = server
+
+        try:
+            logging.info(
+                "Creating intance {} using image alias {} from {}".format(instanceName, alias, serverUrl))
+            logging.info(
+                "This might take a few minutes...")
+            response = self.client.api.instances.post(json={
+                "name": instanceName,
+                "source": {
+                    "type": "image",
+                    "alias": alias,
+                    "mode": "pull",
+                    "server": serverUrl,
+                    "protocol": "simplestreams"
+                }
+            })
+            operation = response.json()['operation']
+            self._waitForOperationWithConsoleUpdates(operation)
+        except Exception as e:
+            logging.error(e)
+            raise LXDError(
+                "Failed to create instance {} using image alias {} from {}".format(instanceName, alias, serverUrl))
+
+    def startInstance(self, instanceName: str):
+        raise LXDError("Not implemented")
+
+    def stopInstance(self, instanceName: str):
+        raise LXDError("Not implemented")
+
+    def deleteInstance(self, instanceName: str):
+        raise LXDError("Not implemented")
+
+    def listInstances(self):
+        # Table with name and IP address.
+        try:
+            for container in self.client.containers.all():
+                print("{}".format(container.name))
+        except Exception as e:
+            logging.error(e)
+            raise LXDError("Fetching list of containers failed")
+
+    def listImages(self):
+        raise LXDError("Not implemented")
