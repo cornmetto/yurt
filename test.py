@@ -3,7 +3,7 @@ import logging
 import time
 
 from config import TestConfig
-from core.vm import VM
+from yurt.vm import VM
 
 logging.basicConfig(format='%(levelname)s: %(message)s', level="INFO")
 

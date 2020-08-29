@@ -55,7 +55,7 @@ class VM:
             logging.info("{0} has already been initialized.".format(
                 config.applicationName))
             logging.info(
-                "If you need to start over, destroy the existing environment first.")
+                "If you need to start over, destroy the existing environment first with `yurt machine destroy`")
             return
 
         vmName = "{0}-{1}".format(config.applicationName, uuid.uuid4())

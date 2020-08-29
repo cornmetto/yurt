@@ -5,6 +5,8 @@ import time
 from enum import Enum
 import urllib3
 import os
+from ws4py.client import WebSocketBaseClient
+import json
 
 from config import ConfigName
 
@@ -42,6 +44,19 @@ class LXDStatusCode(Enum):
             return numericStatusCode
 
 
+class LXDOperationProgress(WebSocketBaseClient):
+    def __init__(self, wsURL, operationId):
+        super().__init__(wsURL)
+        self.operationId = operationId
+
+    def handshake_ok(self):
+        self.messages = []
+
+    def received_message(self, message):
+        json_message = json.loads(message.data.decode('utf-8'))
+        print(json_message)
+
+
 class LXD:
     def __init__(self, config):
         hostPort = config.get(ConfigName.hostLXDPort)
@@ -49,6 +64,8 @@ class LXD:
             raise LXDError("LXD Port is missing.")
 
         self.config = config
+
+        # TODO 151: Performance. Remove this from __init__. Be lazy.
         self.client = Client(
             endpoint="https://localhost:{}".format(hostPort),
             cert=(config.LXDTLSCert, config.LXDTLSKey),

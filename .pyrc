@@ -1,13 +1,14 @@
 import logging
 
-from core.vboxmanage import VBoxManage
-from core.vm import VM
-from core.lxd import LXD
+from yurt.vboxmanage import VBoxManage
+from yurt.vm import VM
+from yurt.lxd import LXD
 from config import Config
-from core import utils
+from yurt import utils
+from cli import *
 
-logging.basicConfig(
-    format='%(name)s-%(levelname)s: %(message)s', level="DEBUG")
+#logging.basicConfig(
+#    format='%(name)s-%(levelname)s: %(message)s', level="DEBUG")
 
 config = Config(env="dev")
-vm = VM(config)
+
