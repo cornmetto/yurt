@@ -115,7 +115,7 @@ class VM:
                 config.applicationName))
             self.vbox.startVm(self.vmName)
             time.sleep(2)
-            logging.info("Setting up network...")
+            logging.info("Network setup...")
             time.sleep(10)
 
             hostSSHPort = self.vbox.setUpSSHPortForwarding(
