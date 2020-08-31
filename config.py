@@ -2,8 +2,12 @@ import os
 import logging
 import json
 from enum import Enum
+import sys
 
 from yurt.exceptions import ConfigWriteException, ConfigReadException
+
+applicationName = "yurt"
+applianceVersion = "0.1.4"
 
 
 class ConfigName(Enum):
@@ -15,96 +19,94 @@ class ConfigName(Enum):
     hostLXDPort = 6
 
 
-class Config:
-    def __init__(self, applicationName="yurt", env="prod"):
+YURT_ENV = os.environ.get("YURT_ENV")
 
-        if env == "prod":
-            fileName = "config.json"
-            vmInstallDir = "vm"
-        else:
-            fileName = "testConfig.json"
-            vmInstallDir = "vm-test"
+if YURT_ENV == "development":
+    configFileName = "testConfig.json"
+    vmInstallDir = "vm-test"
+else:
+    configFileName = "config.json"
+    vmInstallDir = "vm"
 
-        configDir = os.path.join(os.environ.get(
-            'HOME'), ".{0}".format(applicationName))
-        configFile = os.path.join(configDir, fileName)
+try:
+    configDir = os.path.join(os.environ['HOME'], f".{applicationName}")
+except KeyError:
+    logging.error("HOME environment variable is not set")
+    sys.exit(1)
 
-        self.applicationName = applicationName
-        self.configDir = configDir
-        self.configFile = configFile
+configFile = os.path.join(configDir, configFileName)
+vmInstallDir = os.path.join(configDir, vmInstallDir)
 
-        self._ensureConfigFileExists()
+# Resource Paths ###########################################################
+_srcHome = os.path.dirname(__file__)
+provisionDir = os.path.join(_srcHome, "provision")
+artifactsDir = os.path.join(_srcHome, "artifacts")
+binDir = os.path.join(_srcHome, "bin")
 
-        logging.debug('Using config %s', self.configFile)
 
-        # Constants. ############################################
-        self.applianceVersion = "0.1.4"
+# SSH #####################################################################
+SSHUserName = "yurt"
+SSHPrivateKeyFile = os.path.join(provisionDir, "ssh", "id_rsa_yurt")
+SSHHostKeysFile = os.path.join(configDir, "known_hosts")
 
-        # Paths
-        provisionDir = os.path.join(
-            os.path.dirname(__file__), "provision")
-        self.artifactsDir = os.path.join(
-            os.path.dirname(__file__), "artifacts")
-        self.vmInstallDir = os.path.join(configDir, vmInstallDir)
-        self.SSHUserName = "yurt"
-        self.SSHPrivateKeyFile = os.path.join(
-            provisionDir, ".ssh", "id_rsa_yurt")
-        self.SSHHostKeysFile = os.path.join(
-            configDir, "known_hosts")
-        self.LXDTLSKey = os.path.join(provisionDir, ".tls", "client.key")
-        self.LXDTLSCert = os.path.join(provisionDir, ".tls", "client.crt")
 
-        #########################################################
+# Utilities ###############################################################
+def _ensureConfigFileExists():
+    if not os.path.isdir(configDir):
+        os.makedirs(configDir)
 
-    def _ensureConfigFileExists(self):
-        if not os.path.isdir(self.configDir):
-            os.makedirs(self.configDir)
+    if not os.path.isfile(configFile):
+        with open(configFile, 'w') as f:
+            f.write('{}')
 
-        if not os.path.isfile(self.configFile):
-            with open(self.configFile, 'w') as f:
-                f.write('{}')
 
-    def _readConfig(self):
-        try:
-            with open(self.configFile, 'r') as f:
-                return json.load(f)
-        except FileNotFoundError:
-            msg = 'Config file not found'
-            logging.error(msg)
-            raise ConfigReadException(msg)
-        except json.JSONDecodeError:
-            msg = 'Malformed config file: {0}'.format(self.configFile)
-            logging.error(msg)
-            raise ConfigReadException(msg)
+def _readConfig():
+    try:
+        _ensureConfigFileExists()
+        with open(configFile, 'r') as f:
+            return json.load(f)
+    except FileNotFoundError:
+        msg = 'Config file not found'
+        logging.error(msg)
+        raise ConfigReadException(msg)
+    except json.JSONDecodeError:
+        msg = f"Malformed config file: {configFile}"
+        logging.error(msg)
+        raise ConfigReadException(msg)
 
-    def _writeConfig(self, config):
-        try:
-            with open(self.configFile, 'w') as f:
-                json.dump(config, f)
-        except Exception as e:
-            logging.error("Error writing config: {0}".format(e))
-            raise ConfigWriteException(e)
 
-    def get(self, configName: ConfigName):
-        config = self._readConfig()
-        if config:
-            return config.get(configName.name, None)
+def _writeConfig(config):
+    try:
+        _ensureConfigFileExists()
+        with open(configFile, 'w') as f:
+            json.dump(config, f)
+    except Exception as e:
+        logging.error(f"Error writing config: {e}")
+        raise ConfigWriteException(e)
 
-    def set(self, configName: ConfigName, value: str):
-        old = self._readConfig()
 
-        if old is None:
-            return
+def getConfig(configName: ConfigName):
+    config = _readConfig()
+    if config:
+        return config.get(configName.name, None)
 
-        new = old.copy()
-        new[configName.name] = value
 
-        try:
-            self._writeConfig(new)
-        except ConfigWriteException:
-            self._writeConfig(old)
-            raise ConfigWriteException
+def setConfig(configName: ConfigName, value: str):
+    old = _readConfig()
 
-    def clear(self):
-        logging.debug("Clearing config")
-        self._writeConfig({})
+    if old is None:
+        return
+
+    new = old.copy()
+    new[configName.name] = value
+
+    try:
+        _writeConfig(new)
+    except ConfigWriteException:
+        _writeConfig(old)
+        raise ConfigWriteException
+
+
+def clear():
+    logging.debug("Clearing config")
+    _writeConfig({})

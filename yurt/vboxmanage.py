@@ -7,9 +7,11 @@ import random
 import time
 from functools import reduce
 
-from .utils import isSSHAvailableOnPort, isLXDAvailableOnPort
+import config
 from config import ConfigName
-from .exceptions import VBoxManageException
+
+from yurt.util import isSSHAvailableOnPort
+from yurt.exceptions import VBoxManageException
 
 
 class VBoxManage:
@@ -26,7 +28,7 @@ class VBoxManage:
         # Return Id ???
         def importVm(self, vmName, applianceFile, baseFolder):
             settingsFile = os.path.join(baseFolder, "{}.vbox".format(vmName))
-            memory = 2048
+            memory = 1024
 
             cmd = " ".join([
                 "import {0}".format(applianceFile),
@@ -72,22 +74,20 @@ class VBoxManage:
             cmd = "controlvm {0} acpipowerbutton".format(vmName)
             self._run(cmd)
 
-        def setUpSSHPortForwarding(self, vmName: str, config):
-            currentHostPort = config.get(ConfigName.hostSSHPort)
-            return self._setUpPortForwarding(vmName, config, "ssh", currentHostPort, 22, isSSHAvailableOnPort)
+        def setUpSSHPortForwarding(self, vmName: str):
+            currentHostPort = config.getConfig(ConfigName.hostSSHPort)
+            return self._setUpPortForwarding(vmName, "ssh", currentHostPort, 22, isSSHAvailableOnPort)
 
-        def setUpLXDPortForwarding(self, vmName: str, config):
-            currentHostPort = config.get(ConfigName.hostLXDPort)
-            return self._setUpPortForwarding(vmName, config, "lxd", currentHostPort, 8443, isLXDAvailableOnPort)
-
-        def _setUpPortForwarding(self, vmName: str, config,
-                                 ruleName, initialHostPort, guestPort, isServiceAvailableOnPort
-                                 ):
+        def _setUpPortForwarding(
+            self,
+            vmName: str,
+            ruleName, initialHostPort, guestPort, isServiceAvailableOnPort
+        ):
 
             retryCount, retryWaitTime = (5, 7)
             lowPort, highPort = (4000, 4099)
             hostPort = initialHostPort or lowPort
-            connected = isServiceAvailableOnPort(hostPort, config)
+            connected = isServiceAvailableOnPort(hostPort)
 
             while (retryCount > 0) and not connected:
                 addRuleCmd = 'controlvm {0} natpf1 "{1},tcp,,{2},,{3}"'.format(
@@ -104,23 +104,22 @@ class VBoxManage:
 
                 try:
                     self._run(addRuleCmd)
-                    time.sleep(2)  # Give it time.
-                    connected = isServiceAvailableOnPort(hostPort, config)
-                    if not connected:
-                        hostPort = random.randrange(lowPort, highPort)
-                        retryCount -= 1
-                        time.sleep(retryWaitTime)
-
                 except VBoxManageException:
                     raise VBoxManageException(
                         "An error occurred while setting up SSH")
+
+                time.sleep(2)  # Give it time.
+                connected = isServiceAvailableOnPort(hostPort)
+                if not connected:
+                    retryCount -= 1
+                    time.sleep(retryWaitTime)
+                    hostPort = random.randrange(lowPort, highPort)
 
             if connected:
                 return hostPort
             else:
                 raise VBoxManageException(
-                    "Set up forwarding {0},{1}:{2} but service \
-                     in guest does not appear to be available.".format(ruleName, hostPort, guestPort))
+                    f"Set up SSH forwarding but service in guest does not appear to be available.")
 
         def listHostOnlyInterfaces(self):
             def getIfaceName(line):
