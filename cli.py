@@ -1,18 +1,7 @@
-import argparse
 import logging
-import uuid
 import click
 
-from yurt.vm import VM
-from yurt.lxd import LXDError
-from config import Config
-
-config = Config(env="prod")
-
-
-logger = logging.getLogger()
-
-baseIndent = " " * 4
+from yurt.exceptions import LXDException
 
 
 CONTEXT_SETTINGS = dict(help_option_names=['-h', '--help'])
@@ -29,7 +18,7 @@ def yurt(ctx, v):
     Yurt sets up a virtual machine with a configured LXD environment.
 
     A selection of LXD's commonly used features are exposed through the
-    following commands. For help, use either -h or --help flags with any
+    following commands. For help, use either -h or --help on any
     of the commands. e.g 'yurt launch --help'
     """
     logLevel = logging.DEBUG if v else logging.INFO
@@ -40,9 +29,15 @@ def yurt(ctx, v):
     if not v:
         consoleHandler.addFilter(logging.Filter('root'))
 
+    logger = logging.getLogger()
     logger.handlers.clear()
     logger.addHandler(consoleHandler)
     logger.setLevel(logLevel)
+
+    from yurt.vm import VM
+    from config import Config
+
+    config = Config(env="prod")
     ctx.obj = VM(config)
 
 
@@ -110,7 +105,7 @@ def launch(ctx, image, name):
 
     """
 
-    if not isReady(ctx.obj, baseIndent):
+    if not isReady(ctx.obj):
         return
 
     server, alias = image
@@ -127,15 +122,15 @@ def start(ctx, name):
 
     Start a container instance called NAME
     """
-    click.echo()
+    print()
 
     lxd = ctx.obj.lxd
     try:
         lxd.startInstance(name)
-    except LXDError as e:
+    except LXDException as e:
         logging.error(e.message)
 
-    click.echo()
+    print()
 
 
 @yurt.command()
@@ -151,7 +146,7 @@ def stop(ctx, name):
     lxd = ctx.obj.lxd
     try:
         lxd.stopInstance(name)
-    except LXDError as e:
+    except LXDException as e:
         logging.error(e.message)
 
 
@@ -165,7 +160,7 @@ def delete(ctx, name):
     lxd = ctx.obj.lxd
     try:
         lxd.deleteInstance(name)
-    except LXDError as e:
+    except LXDException as e:
         logging.error(e.message)
 
 
@@ -176,14 +171,14 @@ def status(ctx):
     List instances.
     """
 
-    click.echo()
+    print()
 
     vm = ctx.obj
     lxd = vm.lxd
-    if isReady(vm, baseIndent):
+    if isReady(vm):
         try:
             instances = lxd.listInstances()
-        except LXDError as e:
+        except LXDException as e:
             logging.error(e.message)
             return
 
@@ -194,7 +189,7 @@ def status(ctx):
             logging.info("No instances found.")
             logging.info("Run 'yurt launch -h' for help getting started.")
 
-    click.echo()
+    print()
 
 
 @yurt.command()
@@ -207,13 +202,12 @@ def images(ctx):
 
 
 # Interface Utilities
-def isReady(vm, indent):
+def isReady(vm):
     if not vm.isInitialized():
-        click.echo(
-            f"{indent}yurt is not initialized. Initialize with 'yurt init'.")
+        print("yurt is not initialized. Initialize with 'yurt init'.")
         return False
     elif not vm.isRunning():
-        click.echo(f"{indent}yurt is not running. Start with 'yurt up'.")
+        print("yurt is not running. Start with 'yurt up'.")
         return False
 
     return True

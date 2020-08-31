@@ -3,14 +3,11 @@ import uuid
 import os
 import time
 
-from .vboxmanage import VBoxManage, VBoxManageError
-from .lxd import LXD, LXDError
-from config import ConfigName, ConfigReadError, ConfigWriteError
-
-
-class VMError(Exception):
-    def __init__(self, message):
-        self.message = message
+from .vboxmanage import VBoxManage
+from .exceptions import (LXDException, VBoxManageException,
+                         ConfigReadException, ConfigWriteException, VMException)
+from .lxd import LXD
+from config import ConfigName
 
 
 class VM:
@@ -28,7 +25,7 @@ class VM:
             try:
                 self.vbox.getVmInfo(self.vmName)
                 return True
-            except VBoxManageError:
+            except VBoxManageException:
                 logging.error(
                     "Inconsistent environment.")
                 return False
@@ -38,7 +35,7 @@ class VM:
         try:
             vmInfo = self.vbox.getVmInfo(self.vmName)
             return vmInfo["VMState"].strip('"') == "running"
-        except (VBoxManageError, KeyError):
+        except (VBoxManageException, KeyError):
             logging.error(
                 "An error occurred while trying to determine status.")
 
@@ -94,16 +91,16 @@ class VM:
                                    'nicpromisc2': 'allow-all'
                                })
 
-        except (VBoxManageError, ConfigWriteError):
+        except (VBoxManageException, ConfigWriteException):
             msg = "Network initialization failed"
             logging.error(msg)
-            raise VBoxManageError(msg)
+            raise VBoxManageException(msg)
 
     def start(self):
         config = self.config
 
         if not self.isInitialized():
-            raise VMError("VM has not yet been initialized")
+            raise VMException("VM has not yet been initialized")
 
         if self.isRunning():
             logging.info("{0} is already running".format(
@@ -128,7 +125,7 @@ class VM:
             self.lxd = LXD(config)
             self.lxd.setUp()
 
-        except (VBoxManageError, ConfigWriteError, LXDError) as e:
+        except (VBoxManageException, ConfigWriteException, LXDException) as e:
             logging.error(e.message)
             logging.error("Start up failed")
 
@@ -140,7 +137,7 @@ class VM:
 
         try:
             self.vbox.stopVm(self.vmName)
-        except VBoxManageError:
+        except VBoxManageException:
             logging.error("Shut down failed")
 
     def destroy(self, force=False):
@@ -157,6 +154,6 @@ class VM:
             self.config.clear()
             self.vmName = None
             self.lxd = None
-        except VBoxManageError:
+        except VBoxManageException:
             logging.error("Failed to destroy {0} environment.".format(
                 self.config.applicationName))

@@ -3,6 +3,8 @@ import logging
 import json
 from enum import Enum
 
+from yurt.exceptions import ConfigWriteException, ConfigReadException
+
 
 class ConfigName(Enum):
     vmName = 1
@@ -11,16 +13,6 @@ class ConfigName(Enum):
     hostOnlyInterfaceNetworkMask = 4
     hostSSHPort = 5
     hostLXDPort = 6
-
-
-class ConfigReadError(Exception):
-    def __init__(self, message):
-        self.message = message
-
-
-class ConfigWriteError(Exception):
-    def __init__(self, message):
-        self.message = message
 
 
 class Config:
@@ -79,11 +71,11 @@ class Config:
         except FileNotFoundError:
             msg = 'Config file not found'
             logging.error(msg)
-            raise ConfigReadError(msg)
+            raise ConfigReadException(msg)
         except json.JSONDecodeError:
             msg = 'Malformed config file: {0}'.format(self.configFile)
             logging.error(msg)
-            raise ConfigReadError(msg)
+            raise ConfigReadException(msg)
 
     def _writeConfig(self, config):
         try:
@@ -91,7 +83,7 @@ class Config:
                 json.dump(config, f)
         except Exception as e:
             logging.error("Error writing config: {0}".format(e))
-            raise ConfigWriteError(e)
+            raise ConfigWriteException(e)
 
     def get(self, configName: ConfigName):
         config = self._readConfig()
@@ -109,9 +101,9 @@ class Config:
 
         try:
             self._writeConfig(new)
-        except ConfigWriteError:
+        except ConfigWriteException:
             self._writeConfig(old)
-            raise ConfigWriteError
+            raise ConfigWriteException
 
     def clear(self):
         logging.debug("Clearing config")

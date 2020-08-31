@@ -9,11 +9,7 @@ from functools import reduce
 
 from .utils import isSSHAvailableOnPort, isLXDAvailableOnPort
 from config import ConfigName
-
-
-class VBoxManageError(Exception):
-    def __init__(self, message):
-        self.message = message
+from .exceptions import VBoxManageException
 
 
 class VBoxManage:
@@ -115,14 +111,14 @@ class VBoxManage:
                         retryCount -= 1
                         time.sleep(retryWaitTime)
 
-                except VBoxManageError:
-                    raise VBoxManageError(
+                except VBoxManageException:
+                    raise VBoxManageException(
                         "An error occurred while setting up SSH")
 
             if connected:
                 return hostPort
             else:
-                raise VBoxManageError(
+                raise VBoxManageException(
                     "Set up forwarding {0},{1}:{2} but service \
                      in guest does not appear to be available.".format(ruleName, hostPort, guestPort))
 
@@ -157,10 +153,10 @@ class VBoxManage:
                 except ValueError as e:
                     logging.error(
                         "Error processing line {0}: {1}".format(line, e))
-                    raise VBoxManageError(
+                    raise VBoxManageException(
                         "Unexpected result from 'list hostonlyifs'")
 
-            raise VBoxManageError(
+            raise VBoxManageException(
                 "Interface {} not found".format(interfaceName))
 
         def createHostOnlyInterface(self):
@@ -213,7 +209,7 @@ class VBoxManage:
                 logging.debug(e)
                 msg = "{0} failed".format(cmd)
                 logging.debug(msg)
-                raise VBoxManageError(msg)
+                raise VBoxManageException(msg)
 
         def __repr__(self):
             return "VBoxManage Executable: {0}".format(self.executable)

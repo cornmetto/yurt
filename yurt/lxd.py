@@ -1,6 +1,6 @@
 import logging
 from pylxd import Client, models, exceptions
-import ipaddress
+from ipaddress import ip_interface
 import time
 from enum import Enum
 import urllib3
@@ -9,13 +9,9 @@ from ws4py.client import WebSocketBaseClient
 import json
 
 from config import ConfigName
+from .exceptions import LXDException
 
 urllib3.disable_warnings()
-
-
-class LXDError(Exception):
-    def __init__(self, message):
-        self.message = message
 
 
 class LXDStatusCode(Enum):
@@ -66,11 +62,10 @@ class LXD:
         hostPort = self.config.get(ConfigName.hostLXDPort)
         hostPort = 8433
         if not hostPort:
-            raise LXDError("LXD Port is missing.")
+            raise LXDException("LXD Port is missing.")
 
         return Client(
             endpoint="http://localhost:{}".format(hostPort),
-            cert=(self.config.LXDTLSCert, self.config.LXDTLSKey),
             verify=False
         )
 
@@ -80,7 +75,7 @@ class LXD:
             self._setUpNetwork(client)
             self._setUpProfile(client)
         except Exception as e:
-            raise LXDError("LXD set up failed: {}".format(e))
+            raise LXDException("LXD set up failed: {}".format(e))
 
     def _setUpNetwork(self, client):
         if models.Network.exists(client, self.networkName):
@@ -89,13 +84,13 @@ class LXD:
         ipAddress = self.config.get(ConfigName.hostOnlyInterfaceIPAddress)
         networkMask = self.config.get(ConfigName.hostOnlyInterfaceNetworkMask)
         if not (ipAddress and networkMask):
-            raise LXDError("Bad IP Configuration. ip: {0}, mask: {1}".format(
+            raise LXDException("Bad IP Configuration. ip: {0}, mask: {1}".format(
                 ipAddress, networkMask))
 
-        fullHostAddress = ipaddress.ip_interface(
+        fullHostAddress = ip_interface(
             "{0}/{1}".format(ipAddress, networkMask))
 
-        guestBridgeAddress = ipaddress.ip_interface(
+        guestBridgeAddress = ip_interface(
             "{0}/{1}".format((fullHostAddress + 1).ip, networkMask)).exploded
         dhcpRangeLow = (fullHostAddress + 10).ip.exploded
         dhcpRangeHigh = (fullHostAddress + 249).ip.exploded
@@ -209,7 +204,7 @@ class LXD:
             self._waitForOperationWithConsoleUpdates(client, operation)
         except Exception as e:
             logging.error(e)
-            raise LXDError(
+            raise LXDException(
                 "Failed to create instance {} using image alias {} from {}".format(instanceName, alias, serverUrl))
 
     def _getInstance(self, instanceName: str):
@@ -217,9 +212,9 @@ class LXD:
         try:
             return client.instances.get(instanceName)
         except exceptions.NotFound:
-            raise LXDError(f"Instance {instanceName} not found.")
+            raise LXDException(f"Instance {instanceName} not found.")
         except exceptions.LXDAPIException:
-            raise LXDError(
+            raise LXDException(
                 f"Could not fetch instance {instanceName}. Something went wrong")
 
     def startInstance(self, instanceName: str):
@@ -228,7 +223,7 @@ class LXD:
             instance.start()
         except Exception as e:
             logging.error(e)
-            raise LXDError("Failed to start instance")
+            raise LXDException("Failed to start instance")
 
     def stopInstance(self, instanceName: str):
         instance = self._getInstance(instanceName)
@@ -236,7 +231,7 @@ class LXD:
             instance.stop()
         except Exception as e:
             logging.error(e)
-            raise LXDError("Failed to stop instance")
+            raise LXDException("Failed to stop instance")
 
     def deleteInstance(self, instanceName: str):
         instance = self._getInstance(instanceName)
@@ -244,7 +239,7 @@ class LXD:
             instance.delete()
         except Exception as e:
             logging.error(e)
-            raise LXDError("Failed to delete instance")
+            raise LXDException("Failed to delete instance")
 
     def listInstances(self):
         client = self._getClient()
@@ -274,7 +269,7 @@ class LXD:
             return list(map(extractInstanceInfo, client.containers.all()))
         except exceptions.LXDAPIException as e:
             logging.error(e)
-            raise LXDError("Failed to fetch instances")
+            raise LXDException("Failed to fetch instances")
 
     def listImages(self):
-        raise LXDError("Not implemented")
+        raise LXDException("Not implemented")
