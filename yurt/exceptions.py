@@ -3,17 +3,21 @@ class YurtException(Exception):
         self.message = message
 
 
+class YurtCalledProcessException(YurtException):
+    pass
+
+
+class YurtCalledProcessTimeout(YurtException):
+    pass
+
+
+class LXCException(YurtException):
+    pass
+
+
+class VBoxException(YurtException):
+    pass
+
+
 class VMException(YurtException):
-    pass
-
-
-class VBoxManageException(YurtException):
-    pass
-
-
-class ConfigReadException(YurtException):
-    pass
-
-
-class ConfigWriteException(YurtException):
     pass

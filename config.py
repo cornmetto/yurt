@@ -4,7 +4,7 @@ import json
 from enum import Enum
 import sys
 
-from yurt.exceptions import ConfigWriteException, ConfigReadException
+from yurt.exceptions import YurtException
 
 applicationName = "yurt"
 applianceVersion = "0.1.4"
@@ -19,23 +19,29 @@ class ConfigName(Enum):
     hostLXDPort = 6
 
 
+class ConfigReadException(YurtException):
+    pass
+
+
+class ConfigWriteException(YurtException):
+    pass
+
+
 YURT_ENV = os.environ.get("YURT_ENV")
 
 if YURT_ENV == "development":
-    configFileName = "testConfig.json"
-    vmInstallDir = "vm-test"
+    configDirName = f".{applicationName}"
 else:
-    configFileName = "config.json"
-    vmInstallDir = "vm"
+    configDirName = f".{applicationName}-dev"
 
 try:
-    configDir = os.path.join(os.environ['HOME'], f".{applicationName}")
+    configDir = os.path.join(os.environ['HOME'], f"{configDirName}")
 except KeyError:
     logging.error("HOME environment variable is not set")
     sys.exit(1)
 
-configFile = os.path.join(configDir, configFileName)
-vmInstallDir = os.path.join(configDir, vmInstallDir)
+configFile = os.path.join(configDir, "config.json")
+vmInstallDir = os.path.join(configDir, "vm")
 
 # Resource Paths ###########################################################
 _srcHome = os.path.dirname(__file__)

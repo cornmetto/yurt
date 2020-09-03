@@ -3,7 +3,7 @@ import logging
 import time
 
 from yurt import vm
-from yurt.vm import VMState
+from yurt.vm import State
 
 logging.basicConfig(format='%(levelname)s: %(message)s', level="INFO")
 
@@ -23,14 +23,14 @@ class SmokeTest(unittest.TestCase):
         timeOut = 30
         retryStep = 5
         while timeOut > 0:
-            if vm.state() == VMState.Running:
+            if vm.state() == State.Running:
                 break
             logging.info(
                 "Not running. Retrying in {0} seconds...".format(retryStep))
             time.sleep(retryStep)
             timeOut -= retryStep
 
-        self.assertTrue(vm.state() == VMState.Running)
+        self.assertTrue(vm.state() == State.Running)
 
 
 if __name__ == '__main__':

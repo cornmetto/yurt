@@ -1,17 +1,14 @@
 import platform
 import os
 import time
-import subprocess
 from ipaddress import ip_interface
 import logging
 import json
+from typing import List
 
-from yurt.exceptions import YurtException
+from yurt.exceptions import LXCException
+from yurt.util import run
 import config
-
-
-class LXCException(YurtException):
-    pass
 
 
 NETWORK_NAME = "yurt-int"
@@ -26,40 +23,19 @@ def getLXCExecutable():
         raise LXCException("Executable not found for platform")
 
 
-def run(args, stdin=None):
-
-    lxc = getLXCExecutable()
-    cmd = [lxc] + args
-
-    logging.debug(f"Running: {cmd}")
-
-    env = dict(os.environ)
-    env['HOME'] = config.configDir
-
-    res = subprocess.run(cmd, capture_output=True,
-                         text=True, env=env, input=stdin)
-
-    try:
-        res.check_returncode()
-        return res.stdout
-    except subprocess.CalledProcessError as e:
-        logging.debug(e)
-        raise LXCException(res.stderr)
-
-
 def isRemoteAdded():
-    result = run(["remote", "list", "--format", "json"])
+    result = run_lxc(["remote", "list", "--format", "json"])
     remotes = json.loads(result)
     return bool(remotes.get("yurt"))
 
 
 def isNetworkConfigured():
-    networks = json.loads(run(["network", "list", "--format", "json"]))
+    networks = json.loads(run_lxc(["network", "list", "--format", "json"]))
     return NETWORK_NAME in list(map(lambda n: n["name"], networks))
 
 
 def isProfileConfigured():
-    profiles = json.loads(run(["profile", "list", "--format", "json"]))
+    profiles = json.loads(run_lxc(["profile", "list", "--format", "json"]))
     return PROFILE_NAME in list(map(lambda p: p["name"], profiles))
 
 
@@ -94,17 +70,17 @@ def configureNetwork():
     dhcpRangeLow = ipConfig["dhcpRangeLow"]
     dhcpRangeHigh = ipConfig["dhcpRangeHigh"]
 
-    run(["network", "create", NETWORK_NAME,
-         "bridge.external_interfaces=enp0s8",
-         "ipv6.address=none",
-         "ipv4.nat=true",
-         "ipv4.dhcp=true",
-         "ipv4.dhcp.expiry=48h",
-         f"ipv4.address={bridgeAddress}",
-         f"ipv4.dhcp.ranges={dhcpRangeLow}-{dhcpRangeHigh}",
-         f"dns.domain={config.applicationName}"
-         ]
-        )
+    run_lxc(["network", "create", NETWORK_NAME,
+             "bridge.external_interfaces=enp0s8",
+             "ipv6.address=none",
+             "ipv4.nat=true",
+             "ipv4.dhcp=true",
+             "ipv4.dhcp.expiry=48h",
+             f"ipv4.address={bridgeAddress}",
+             f"ipv4.dhcp.ranges={dhcpRangeLow}-{dhcpRangeHigh}",
+             f"dns.domain={config.applicationName}"
+             ]
+            )
 
 
 def configureProfile():
@@ -122,11 +98,26 @@ devices:
         pool: yurt
         type: disk"""
 
-    run(["profile", "create", PROFILE_NAME])
-    run(["profile", "edit", PROFILE_NAME], stdin=profileConfig)
+    run_lxc(["profile", "create", PROFILE_NAME])
+    run_lxc(["profile", "edit", PROFILE_NAME], stdin=profileConfig)
 
 
 def addRemote():
-    run(["remote", "add", "yurt", "localhost",
-         "--password", "yurtsecret", "--accept-certificate"])
-    run(["remote", "switch", "yurt"])
+    run_lxc(["remote", "add", "yurt", "localhost",
+             "--password", "yurtsecret", "--accept-certificate"])
+    run_lxc(["remote", "switch", "yurt"])
+
+
+def run_lxc(args: List[str], **kwargs):
+    """
+    See yurt.util.run for **kwargs documentation.
+    """
+
+    lxc = getLXCExecutable()
+    cmd = [lxc] + args
+
+    lxc_env = {
+        "HOME": config.configDir
+    }
+
+    return run(cmd, env=lxc_env, **kwargs)

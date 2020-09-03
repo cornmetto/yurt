@@ -1,18 +1,19 @@
 import logging
 import os
-import json
 from typing import List
 
 import config
 from config import ConfigName
 
-from yurt.exceptions import YurtException
+from yurt.exceptions import LXCException, YurtCalledProcessException
 from yurt.lxc.util import *  # pylint: disable=unused-wildcard-import
 from yurt.util import retry, find
 
 
 def ensureSetupIsComplete():
     # Usually called immediately after boot. Retry a few times before giving up.
+    logging.info("Making sure LXD is ready...")
+
     def runSetupOperations():
         if not isRemoteAdded():
             addRemote()
@@ -21,7 +22,7 @@ def ensureSetupIsComplete():
         if not isProfileConfigured():
             configureProfile()
 
-    retries, waitTime = 3, 5
+    retries, waitTime = 4, 5
     retry(runSetupOperations, retries, waitTime)
 
 
@@ -33,6 +34,8 @@ def destroy():
 
 
 def list_():
+    import json
+
     def getInfo(instance):
         try:
             addresses = instance["state"]["network"]["eth0"]["addresses"]
@@ -57,34 +60,34 @@ def list_():
 
         }
     try:
-        output = run(["list", "--format", "json"])
+        output = run_lxc(["list", "--format", "json"], show_spinner=True)
         instances = json.loads(output)
         return list(map(getInfo, instances))
-    except LXCException:
-        raise LXCException("Failed to list networks")
+    except YurtCalledProcessException as e:
+        raise LXCException(f"Failed to list networks: {e.message}")
 
 
 def start(names: List[str]):
     cmd = ['start'] + names
-    return run(cmd)
+    return run_lxc(cmd)
 
 
 def stop(names: List[str], force=False):
     cmd = ["stop"] + names
     if force:
         cmd.append("--force")
-    return run(cmd)
+    return run_lxc(cmd)
 
 
 def delete(names: List[str], force=False):
     cmd = ["delete"] + names
     if force:
         cmd.append("--force")
-    return run(cmd)
+    return run_lxc(cmd)
 
 
 def info(name: str):
-    return run(["info", name])
+    return run_lxc(["info", name])
 
 
 def launch(image: str, name: str):
@@ -96,6 +99,6 @@ def launch(image: str, name: str):
     #   - Not end with a dash
 
     logging.info("This might take a few minutes...")
-    run(["launch", image, name,
-         "--profile=default",
-         f"--profile={PROFILE_NAME}"])
+    run_lxc(["launch", image, name,
+             "--profile=default",
+             f"--profile={PROFILE_NAME}"], capture_output=False, timeout=None)

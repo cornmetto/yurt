@@ -9,6 +9,6 @@ setup(
     ],
     entry_points='''
         [console_scripts]
-        yurt=cli:yurt
+        yurt=cli:main
     ''',
 )

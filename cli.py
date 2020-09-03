@@ -1,8 +1,11 @@
 import logging
 import click
 
-from yurt.exceptions import YurtException
 import config
+
+from yurt.exceptions import YurtException
+from yurt import vm
+from yurt import lxc
 
 
 CONTEXT_SETTINGS = dict(help_option_names=['-h', '--help'])
@@ -11,104 +14,131 @@ CONTEXT_SETTINGS = dict(help_option_names=['-h', '--help'])
 @click.group(context_settings=CONTEXT_SETTINGS)
 @click.option("-v", "--verbose", is_flag=True, help="Increase verbosity.")
 @click.version_option()
-def yurt(verbose):
+def main(verbose):
     """
     Linux Containers for Development.
 
-    Yurt sets up a virtual machine with a pre-configured LXD environment.
+    Yurt sets up a virtual machine with a pre-configured LXD Server.
+    Containers can be accessed directly from the host using their assigned
+    IP addresses. Run 'yurt ssh <instance>' to quickly SSH into a running
+    instance.
 
     A selection of LXD's commonly used features are exposed through the
     following commands. For help, use either -h or --help on any
-    of the commands. e.g 'yurt launch --help'
+    of the commands. e.g 'yurt launch --help'.
+
     """
 
-    consoleHandler = logging.StreamHandler()
-    logFormatter = logging.Formatter("-> %(levelname)s-%(name)s: %(message)s")
-    consoleHandler.setFormatter(logFormatter)
+    console_handler = logging.StreamHandler()
+    log_formatter = logging.Formatter("-> %(levelname)s-%(name)s: %(message)s")
+    console_handler.setFormatter(log_formatter)
     if config.YURT_ENV == "development":
         logLevel = logging.DEBUG
     else:
         if verbose:
-            consoleHandler.addFilter(logging.Filter('root'))
+            console_handler.addFilter(logging.Filter('root'))
             logLevel = logging.DEBUG
         else:
             logLevel = logging.INFO
 
     logger = logging.getLogger()
     logger.handlers.clear()
-    logger.addHandler(consoleHandler)
+    logger.addHandler(console_handler)
     logger.setLevel(logLevel)
 
 
 # VM #################################################################
-@yurt.group()
+@main.group(name="vm")
 @click.pass_context
-def vm(ctx):
+def vm_cmd(ctx):
     """
     Manage the Yurt VM.
     """
     pass
 
 
-@vm.command()
+@vm_cmd.command()
 @click.pass_context
 def init(ctx):
     """
     Initialize yurt VM.
     """
-    from yurt import vm
+
     try:
         vm.init()
     except YurtException as e:
         logging.error(e.message)
 
 
-@vm.command()
-def destroy():
+@vm_cmd.command()
+@click.option("-f", "--force", is_flag=True, help="Force deletion of VM resources belonging to yurt.")
+def destroy(force):
     """
     Delete all resources including the yurt VM.
     """
-    from yurt import vm
-    from yurt import lxc
+
     try:
-        vm.destroy()
-        lxc.destroy()
+        vm_state = vm.state()
+
+        if vm_state == vm.State.NotInitialized and not force:
+            logging.info("yurt has not been initialized.")
+        elif vm_state == vm.State.Running and not force:
+            logging.error(
+                "Cannot destroy while VM is running. Stop it first with 'yurt vm stop'")
+        else:
+            vm.destroy()
+            lxc.destroy()
     except YurtException as e:
-        logging.error(e.message)
+        if force:
+            vm.force_delete_yurt_dir()
+        else:
+            logging.error(e.message)
+            logging.info(
+                "Run 'yurt vm delete --force' to force deletion of VM resources belonging to Yurt.")
+    except Exception:
+        if force:
+            vm.force_delete_yurt_dir()
 
 
-@vm.command(name="start")
+@vm_cmd.command(name="start")
 def start_vm():
     """
     Start yurt VM
     """
-    from yurt import vm
-    from yurt import lxc
+
     try:
-        vm.start()
-        lxc.ensureSetupIsComplete()
+        vm_state = vm.state()
+
+        if vm_state == vm.State.NotInitialized:
+            logging.info(
+                "Yurt VM has not been initialized. Initialze with 'yurt init'.")
+        elif vm_state == vm.State.Running:
+            logging.info("VM is already running")
+        else:
+            vm.start()
+            lxc.ensureSetupIsComplete()
+
     except YurtException as e:
         logging.error(e.message)
 
 
-@vm.command(name="stop")
+@vm_cmd.command(name="stop")
 def stop_vm():
     """
     Shut down yurt VM
     """
-    from yurt import vm
+
     try:
         vm.shutdown()
     except YurtException as e:
         logging.error(e.message)
 
 
-@vm.command(name="info")
+@vm_cmd.command(name="info")
 def vm_info():
     """
     Show information about the Yurt VM.
     """
-    from yurt import vm
 
     try:
         for k, v in vm.info().items():
@@ -120,7 +150,7 @@ def vm_info():
 # Instances #############################################################
 
 
-@yurt.command()
+@main.command()
 @click.argument("image")
 @click.argument("name")
 @click.pass_context
@@ -137,73 +167,69 @@ def launch(ctx, image, name):
     """
 
     try:
-        checkVm()
+        check_vm()
 
-        from yurt import lxc
         lxc.launch(image, name)
 
     except YurtException as e:
         logging.error(e.message)
 
 
-@yurt.command()
+@main.command()
 @click.argument("instances", metavar="<instance>...", nargs=-1)
 def start(instances):
     """
     Start a 'Stopped' instance.
     """
 
-    checkVariadicArgument(instances)
+    check_variadic_argument(instances)
 
     try:
-        checkVm()
+        check_vm()
 
-        from yurt import lxc
         lxc.start(list(instances))
 
     except YurtException as e:
         logging.error(e.message)
 
 
-@yurt.command()
+@main.command()
 @click.argument("instances", metavar="<instance>...", nargs=-1)
 @click.option("-f", "--force", help="Force the instance to shutdown", is_flag=True)
 def stop(instances, force):
     """
     Stop an instance.
     """
-    checkVariadicArgument(instances)
+    check_variadic_argument(instances)
 
     try:
-        checkVm()
+        check_vm()
 
-        from yurt import lxc
         print(lxc.stop(list(instances), force=force))
 
     except YurtException as e:
         logging.error(e.message)
 
 
-@yurt.command()
+@main.command()
 @click.argument("instances", metavar="<instance>...", nargs=-1)
 @click.option("-f", "--force", help="Force deletion of a running instance", is_flag=True)
 def delete(instances, force):
     """
     Delete an instance.
     """
-    checkVariadicArgument(instances)
+    check_variadic_argument(instances)
 
     try:
-        checkVm()
+        check_vm()
 
-        from yurt import lxc
         lxc.delete(list(instances), force=force)
 
     except YurtException as e:
         logging.error(e.message)
 
 
-@yurt.command()
+@main.command()
 @click.argument("instance", metavar="<instance>")
 def info(instance):
     """
@@ -211,16 +237,15 @@ def info(instance):
     """
 
     try:
-        checkVm()
+        check_vm()
 
-        from yurt import lxc
         lxc.info(instance)
 
     except YurtException as e:
         logging.error(e.message)
 
 
-@yurt.command(name="list")
+@main.command(name="list")
 @click.pass_context
 def list_(ctx):
     """
@@ -228,10 +253,9 @@ def list_(ctx):
     """
 
     try:
-        checkVm()
+        check_vm()
 
         from tabulate import tabulate
-        from yurt import lxc
 
         instances = tabulate(lxc.list_(), headers="keys")
         print(instances)
@@ -243,23 +267,22 @@ def list_(ctx):
 # CLI Utilities ########################################################
 
 
-def checkVm():
+def check_vm():
     """
     Raise YurtException with the appropriate message if the VM is not
     initialized and running.
     """
-    from yurt import vm
 
-    vmState = vm.state()
-    if vmState == vm.VMState.NotInitialized:
+    vm_state = vm.state()
+    if vm_state == vm.State.NotInitialized:
         raise YurtException(
-            "The Yurt VM has not been initialized. Initialize with 'yurt vm init'")
-    if vmState == vm.VMState.Stopped:
+            "The VM has not been initialized. Initialize with 'yurt vm init'")
+    if vm_state == vm.State.Stopped:
         raise YurtException(
-            "The Yurt VM is not running. Start it up with 'yurt vm start'")
+            "The VM is not running. Start it up with 'yurt vm start'")
 
 
-def checkVariadicArgument(arg):
+def check_variadic_argument(arg):
     if not arg:
         ctx = click.get_current_context()
         click.echo(ctx.get_help())
