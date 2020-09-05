@@ -87,7 +87,7 @@ def _render_spinner(spinner, clear=False):
     if clear:
         print(f"\r{' ' * 80}\r", end="", file=sys.stderr)
     elif spinner:
-        print(f"\r{next(spinner)}", end="", file=sys.stderr)
+        print(f"\r{next(spinner)}\r", end="", file=sys.stderr)
 
 
 def _async_spinner(worker_future):
@@ -124,22 +124,20 @@ def _run(cmd, stdin=None, capture_output=True, timeout=None, env=None):
 
     logging.debug(f"Running: {cmd}")
 
-    newEnv = dict(os.environ)
+    new_env = dict(os.environ)
     if env:
-        newEnv.update(env)
+        new_env.update(env)
 
-    res = None
     try:
         res = subprocess.run(cmd, capture_output=capture_output,
-                             text=True, check=True, env=newEnv, input=stdin, timeout=timeout)
+                             text=True, check=True, env=new_env, input=stdin, timeout=timeout)
         return res.stdout
 
     except subprocess.CalledProcessError as e:
-        logging.debug(e)
-
-        if res and res.stderr:
-            logging.debug(res.stderr)
-
+        if e.stdout:
+            logging.debug(f"{os.path.basename(cmd[0])}: {e.stdout}")
+        if e.stderr:
+            logging.error(f"{os.path.basename(cmd[0])}: {e.stderr}")
         raise YurtCalledProcessException("Operation failed.")
 
     except subprocess.TimeoutExpired as e:

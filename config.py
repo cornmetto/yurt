@@ -30,9 +30,9 @@ class ConfigWriteException(YurtException):
 YURT_ENV = os.environ.get("YURT_ENV")
 
 if YURT_ENV == "development":
-    configDirName = f".{applicationName}"
-else:
     configDirName = f".{applicationName}-dev"
+else:
+    configDirName = f".{applicationName}"
 
 try:
     configDir = os.path.join(os.environ['HOME'], f"{configDirName}")

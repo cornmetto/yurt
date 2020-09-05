@@ -71,7 +71,7 @@ def init(ctx):
 
 
 @vm_cmd.command()
-@click.option("-f", "--force", is_flag=True, help="Force deletion of VM resources belonging to yurt.")
+@click.option("-f", "--force", is_flag=True, help="Delete VM resources belonging to yurt even if destroy fails.")
 def destroy(force):
     """
     Delete all resources including the yurt VM.
@@ -80,9 +80,9 @@ def destroy(force):
     try:
         vm_state = vm.state()
 
-        if vm_state == vm.State.NotInitialized and not force:
+        if vm_state == vm.State.NotInitialized:
             logging.info("yurt has not been initialized.")
-        elif vm_state == vm.State.Running and not force:
+        elif vm_state == vm.State.Running:
             logging.error(
                 "Cannot destroy while VM is running. Stop it first with 'yurt vm stop'")
         else:
