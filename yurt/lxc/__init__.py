@@ -6,5 +6,6 @@ from .lxc import (
     delete,
     start,
     stop,
-    info
+    info,
+    shell
 )

@@ -49,8 +49,7 @@ def main(verbose):
 
 # VM #################################################################
 @main.group(name="vm")
-@click.pass_context
-def vm_cmd(ctx):
+def vm_cmd():
     """
     Manage the Yurt VM.
     """
@@ -58,8 +57,7 @@ def vm_cmd(ctx):
 
 
 @vm_cmd.command()
-@click.pass_context
-def init(ctx):
+def init():
     """
     Initialize yurt VM.
     """
@@ -153,8 +151,7 @@ def vm_info():
 @main.command()
 @click.argument("image")
 @click.argument("name")
-@click.pass_context
-def launch(ctx, image, name):
+def launch(image, name):
     """
     Create and start an instance.
 
@@ -246,8 +243,7 @@ def info(instance):
 
 
 @main.command(name="list")
-@click.pass_context
-def list_(ctx):
+def list_():
     """
     List instances.
     """
@@ -258,11 +254,28 @@ def list_(ctx):
         from tabulate import tabulate
 
         instances = tabulate(lxc.list_(), headers="keys")
-        print(instances)
+        click.echo(instances)
 
     except YurtException as e:
         logging.error(e.message)
 
+
+@main.command()
+@click.argument('instance', metavar="<instance>")
+def shell(instance):
+    """
+    Start a shell in an instance.
+
+    This is intended for bootstrapping your instances. It starts a shell 
+    as root in <instance>.
+    Use it to create and configure users who can SSH using the instance's
+    IP address.
+    """
+    try:
+        check_vm()
+        lxc.shell(instance)
+    except YurtException as e:
+        logging.error(e.message)
 
 # CLI Utilities ########################################################
 

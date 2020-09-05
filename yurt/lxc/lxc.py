@@ -101,4 +101,12 @@ def launch(image: str, name: str):
     logging.info("This might take a few minutes...")
     run_lxc(["launch", image, name,
              "--profile=default",
-             f"--profile={PROFILE_NAME}"], capture_output=False, timeout=None)
+             f"--profile={PROFILE_NAME}"], capture_output=False)
+
+
+def shell(instance: str):
+    run_lxc([
+        "exec", instance,
+        "--env", r"PS1=\[\033[01;32m\]\u@\h\[\033[00m\]:\[\033[01;34m\]\w\[\033[00m\] \# ",
+        "--", "su", "root"],
+        capture_output=False)
