@@ -19,9 +19,8 @@ def main(verbose):
     Linux Containers for Development.
 
     Yurt sets up a virtual machine with a pre-configured LXD Server.
-    Containers can be accessed directly from the host using their assigned
-    IP addresses. Run 'yurt ssh <instance>' to quickly SSH into a running
-    instance.
+    Services running in the containers can be accessed directly from the
+    host using their assigned IP addresses.
 
     A selection of LXD's commonly used features are exposed through the
     following commands. For help, use either -h or --help on any
@@ -36,9 +35,9 @@ def main(verbose):
         logLevel = logging.DEBUG
     else:
         if verbose:
-            console_handler.addFilter(logging.Filter('root'))
             logLevel = logging.DEBUG
         else:
+            console_handler.addFilter(logging.Filter('root'))
             logLevel = logging.INFO
 
     logger = logging.getLogger()
@@ -114,7 +113,7 @@ def start_vm():
             logging.info("VM is already running")
         else:
             vm.start()
-            lxc.ensureSetupIsComplete()
+            lxc.ensure_setup_is_complete()
 
     except YurtException as e:
         logging.error(e.message)
@@ -127,7 +126,7 @@ def stop_vm():
     """
 
     try:
-        vm.shutdown()
+        vm.stop()
     except YurtException as e:
         logging.error(e.message)
 
@@ -276,6 +275,7 @@ def shell(instance):
         lxc.shell(instance)
     except YurtException as e:
         logging.error(e.message)
+
 
 # CLI Utilities ########################################################
 

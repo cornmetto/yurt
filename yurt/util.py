@@ -7,22 +7,22 @@ from yurt.exceptions import (YurtCalledProcessException,
 
 
 def is_ssh_available(port):
-    from paramiko import SSHClient, AuthenticationException, client
-    from paramiko.ssh_exception import SSHException
+    from paramiko import SSHClient, AuthenticationException, client  # type: ignore
+    from paramiko.ssh_exception import SSHException  # type: ignore
     import socket
 
     ssh = SSHClient()
-    if not os.path.isfile(config.SSHHostKeysFile):
-        with open(config.SSHHostKeysFile, "w") as f:
+    if not os.path.isfile(config.ssh_host_keys_file):
+        with open(config.ssh_host_keys_file, "w") as f:
             f.write("")
 
     try:
         logging.debug(
-            f"Checking if SSH is available on port {port}")
-        ssh.load_host_keys(config.SSHHostKeysFile)
+            f"Trying SSH on port {port}.")
+        ssh.load_host_keys(config.ssh_host_keys_file)
         ssh.set_missing_host_key_policy(client.AutoAddPolicy)
-        ssh.connect("localhost", port, username=config.SSHUserName,
-                    key_filename=config.SSHPrivateKeyFile, look_for_keys=False)
+        ssh.connect("localhost", port, username=config.ssh_user_name,
+                    key_filename=config.ssh_private_key_file, look_for_keys=False)
         return True
     except (AuthenticationException,
             SSHException, socket.error) as e:
@@ -46,14 +46,14 @@ def download_file(url, destination):
             shutil.copyfileobj(r.raw, f)
 
 
-def retry(fn, retries, waitTime):
+def retry(fn, retries=3, wait_time=3):
     while True:
         try:
             return fn()
         except Exception as e:
             if retries > 0:
                 retries -= 1
-                sleep_for(waitTime, show_spinner=True)
+                sleep_for(wait_time, show_spinner=True)
             else:
                 raise e
 

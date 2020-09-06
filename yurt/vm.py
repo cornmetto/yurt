@@ -2,13 +2,11 @@ import logging
 from enum import Enum
 
 import config
-from config import ConfigName, ConfigWriteException
+from yurt import util, vbox
+from yurt.exceptions import (ConfigReadException, ConfigWriteException,
+                             VMException, VBoxException)
 
-from yurt import vbox, util
-from yurt.exceptions import VMException
-
-
-_VM_NAME = config.getConfig(ConfigName.vmName)
+_VM_NAME = config.get_config(config.Key.vm_name)
 
 
 class State(Enum):
@@ -20,10 +18,10 @@ class State(Enum):
 def state():
     if _VM_NAME:
         try:
-            vmInfo = vbox.get_vm_info(_VM_NAME)
-            isRunning = vmInfo["VMState"].strip('"') == "running"
-            return State.Running if isRunning else State.Stopped
-        except (vbox.VBoxException, KeyError):
+            vm_info = vbox.get_vm_info(_VM_NAME)
+            is_running = vm_info["VMState"].strip('"') == "running"
+            return State.Running if is_running else State.Stopped
+        except (VBoxException, KeyError):
             raise VMException("An error occurred while fetching VM status.")
     return State.NotInitialized
 
@@ -31,13 +29,13 @@ def state():
 def info():
     if _VM_NAME:
         try:
-            vmInfo = vbox.get_vm_info(_VM_NAME)
+            vm_info = vbox.get_vm_info(_VM_NAME)
             return {
-                "State": "Running" if vmInfo["VMState"].strip('"') == "running" else "Stopped",
-                "Memory": vmInfo["memory"],
-                "CPUs": vmInfo["cpus"]
+                "State": "Running" if vm_info["VMState"].strip('"') == "running" else "Stopped",
+                "Memory": vm_info["memory"],
+                "CPUs": vm_info["cpus"]
             }
-        except (vbox.VBoxException, KeyError):
+        except (VBoxException, KeyError):
             raise VMException("An error occurred while fetching VM status.")
 
     return {
@@ -45,91 +43,91 @@ def info():
     }
 
 
-def init(applianceVersion=None):
+def init(appliance_version=None):
     global _VM_NAME
     from uuid import uuid4
     from os import path
 
-    if not applianceVersion:
-        applianceVersion = config.applianceVersion
+    if not appliance_version:
+        appliance_version = config.appliance_version
 
-    applianceFile = path.join(config.artifactsDir,
-                              "{0}-{1}.ova".format(config.applicationName, applianceVersion))
+    appliance_file = path.join(config.artifacts_dir,
+                               "{0}-{1}.ova".format(config.app_name, appliance_version))
 
     if state() != State.NotInitialized:
         logging.info("{0} has already been initialized.".format(
-            config.applicationName))
+            config.app_name))
         logging.info(
             "If you need to start over, destroy the existing environment first with `yurt machine destroy`")
         return
 
-    vmName = "{0}-{1}".format(config.applicationName, uuid4())
+    vm_name = "{0}-{1}".format(config.app_name, uuid4())
 
     try:
         logging.info("Importing appliance...")
         vbox.import_vm(
-            vmName, applianceFile, config.vmInstallDir)
+            vm_name, appliance_file, config.vm_install_dir)
 
-        config.setConfig(ConfigName.vmName, vmName)
-        _VM_NAME = vmName
+        config.set_config(config.Key.vm_name, vm_name)
+        _VM_NAME = vm_name
 
-        logging.info("Installing host network interface...")
-        input("""VirtualBox will now ask for permission to add an interface on your machine.
-Press enter to continue..."""
-              )
-        _initializeNetwork()
+        logging.info(
+            "Installing network interface on host - VirtualBox will ask for permission to do so.")
+        input("Press enter to continue...")
+        _initialize_network()
 
-    except (ConfigWriteException, vbox.VBoxException):
+    except (ConfigWriteException, VBoxException):
         logging.error("Initialization failed")
         destroy()
 
 
 def start():
-    vmState = state()
+    vm_state = state()
 
-    if vmState == State.NotInitialized:
-        raise VMException("VM has not yet been initialized")
+    if vm_state == State.NotInitialized:
+        raise VMException("VM has not yet been initialized.")
 
-    if vmState == State.Running:
-        logging.info("{0} is already running".format(
-            config.applicationName))
+    if vm_state == State.Running:
+        logging.info("VM is already running.")
         return
 
     try:
         logging.info("Starting up...")
         vbox.start_vm(_VM_NAME)
 
-        util.sleep_for(2, show_spinner=True)
+        util.sleep_for(5, show_spinner=True)
         logging.info("Network setup...")
-        util.sleep_for(10, show_spinner=True)
+        util.sleep_for(5, show_spinner=True)
 
-        hostSSHPort = vbox.setup_ssh_port_forwarding(
-            _VM_NAME)
-        config.setConfig(ConfigName.hostSSHPort, hostSSHPort)
+        current_port = config.get_config(config.Key.ssh_port)
+        host_ssh_port = vbox.setup_ssh_port_forwarding(_VM_NAME, current_port)
+        config.set_config(config.Key.ssh_port, host_ssh_port)
 
-    except vbox.VBoxException as e:
+    except (VBoxException, ConfigReadException) as e:
         logging.error(e.message)
         raise VMException("Start up failed")
 
 
-def shutdown():
-    if state() == State.NotInitialized:
+def stop():
+    vm_state = state()
+
+    if vm_state == State.NotInitialized:
         logging.info(
-            f"{config.applicationName} has not been initialized. Initialize with 'yurt init'.")
-    elif state() == State.Stopped:
-        logging.info(f"{config.applicationName} is not running")
+            "The VM has not been initialized. Initialize with 'yurt vm init'.")
+    elif vm_state == State.Stopped:
+        logging.info("The VM is not running")
     else:
         try:
             vbox.stop_vm(_VM_NAME)
-        except vbox.VBoxException as e:
+        except VBoxException as e:
             logging.error(e.message)
             raise VMException("Shut down failed")
 
 
 def force_delete_yurt_dir():
     import shutil
-    config_dir = config.configDir
-    shutil.rmtree(config_dir, ignore_errors=True)
+
+    shutil.rmtree(config.config_dir, ignore_errors=True)
 
 
 def destroy():
@@ -137,12 +135,15 @@ def destroy():
 
     try:
         vbox.destroy_vm(_VM_NAME)
-        interfaceName = config.getConfig(ConfigName.hostOnlyInterface)
-        vbox.remove_hostonly_interface(interfaceName)
+        interface_name = config.get_config(config.Key.interface)
+        logging.info(
+            "Removing network interface on host - VirtualBox will ask for permission to do so.")
+        input("Press enter to continue...")
+        vbox.remove_hostonly_interface(interface_name)
 
         _VM_NAME = None
         config.clear()
-    except vbox.VBoxException as e:
+    except VBoxException as e:
         logging.error(e.message)
         raise VMException("Failed to destroy VM.")
 
@@ -150,16 +151,16 @@ def destroy():
 # Utilities ###########################################################
 
 
-def _initializeNetwork():
+def _initialize_network():
     try:
-        interfaceName = vbox.create_hostonly_interface()
-        interfaceInfo = vbox.get_interface_info(interfaceName)
-        IPAddress = interfaceInfo['IPAddress']
-        networkMask = interfaceInfo['NetworkMask']
-        config.setConfig(ConfigName.hostOnlyInterface, interfaceName)
-        config.setConfig(ConfigName.hostOnlyInterfaceIPAddress, IPAddress)
-        config.setConfig(
-            ConfigName.hostOnlyInterfaceNetworkMask, networkMask)
+        interface_name = vbox.create_hostonly_interface()
+        interface_info = vbox.get_interface_info(interface_name)
+        ip_address = interface_info['IPAddress']
+        network_mask = interface_info['NetworkMask']
+        config.set_config(config.Key.interface, interface_name)
+        config.set_config(config.Key.interface_ip_address, ip_address)
+        config.set_config(
+            config.Key.interface_netmask, network_mask)
 
         vbox.modify_vm(_VM_NAME,
                        {
@@ -169,10 +170,10 @@ def _initializeNetwork():
                            "natdnshostresolver1": "on",
                            'nic2': 'hostonly',
                            'nictype2': 'virtio',
-                           'hostonlyadapter2': interfaceName,
+                           'hostonlyadapter2': interface_name,
                            'nicpromisc2': 'allow-all'
                        })
 
-    except vbox.VBoxException as e:
+    except VBoxException as e:
         logging.error(e.message)
         raise VMException("Network initialization failed")

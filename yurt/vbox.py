@@ -3,16 +3,13 @@ import logging
 import re
 from typing import Dict, List
 
-import config
-from config import ConfigName
-
 from yurt.util import is_ssh_available, run, YurtCalledProcessException
 from yurt.exceptions import VBoxException
 
 
 def import_vm(vm_name: str, appliance_file: str, base_folder):
     settings_file = os.path.join(base_folder, "{}.vbox".format(vm_name))
-    memory = 1024
+    memory = 2048
 
     cmd = [
         "import", appliance_file,
@@ -62,8 +59,7 @@ def stop_vm(vm_name: str):
     run_vbox(cmd)
 
 
-def setup_ssh_port_forwarding(vm_name: str):
-    current_port = config.getConfig(ConfigName.hostSSHPort)
+def setup_ssh_port_forwarding(vm_name: str, current_port: int):
     return _setup_port_forwarding(vm_name, "ssh", current_port, 22, is_ssh_available)
 
 

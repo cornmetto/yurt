@@ -1,6 +1,6 @@
 from .lxc import (
     destroy,
-    ensureSetupIsComplete,
+    ensure_setup_is_complete,
     launch,
     list_,
     delete,

@@ -21,3 +21,11 @@ class VBoxException(YurtException):
 
 class VMException(YurtException):
     pass
+
+
+class ConfigReadException(YurtException):
+    pass
+
+
+class ConfigWriteException(YurtException):
+    pass

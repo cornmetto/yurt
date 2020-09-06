@@ -1,82 +1,80 @@
 import logging
-import os
 from typing import List
+import os
 
 import config
-from config import ConfigName
 
 from yurt.exceptions import LXCException, YurtCalledProcessException
-from yurt.lxc.util import *  # pylint: disable=unused-wildcard-import
 from yurt.util import retry, find
+from .util import *  # pylint: disable=unused-wildcard-import
 
 
-def ensureSetupIsComplete():
+def ensure_setup_is_complete():
     # Usually called immediately after boot. Retry a few times before giving up.
     logging.info("Making sure LXD is ready...")
 
-    def runSetupOperations():
-        if not isRemoteAdded():
-            addRemote()
-        if not isNetworkConfigured():
-            configureNetwork()
-        if not isProfileConfigured():
-            configureProfile()
+    def run_setup_operations():
+        if not is_remote_configured():
+            configure_remote()
+        if not is_network_configured():
+            configure_network()
+        if not is_profile_configured():
+            configure_profile()
 
-    retries, waitTime = 4, 5
-    retry(runSetupOperations, retries, waitTime)
+    retry(run_setup_operations, retries=6, wait_time=5)
 
 
 def destroy():
-    lxcConfigDir = os.path.join(config.configDir, ".config", "lxc")
-
     import shutil
-    shutil.rmtree(lxcConfigDir, ignore_errors=True)
+
+    lxc_config_dir = os.path.join(config.config_dir, ".config", "lxc")
+    shutil.rmtree(lxc_config_dir, ignore_errors=True)
 
 
 def list_():
     import json
 
-    def getInfo(instance):
+    def get_info(instance):
         try:
             addresses = instance["state"]["network"]["eth0"]["addresses"]
-            ipv4Info = find(lambda a: a["family"] == "inet", addresses, {})
-            ipv4Address = ipv4Info.get("address", "")
+            ipv4_info = find(lambda a: a["family"] == "inet", addresses, {})
+            ipv4_address = ipv4_info.get("address", "")
         except KeyError as e:
             logging.debug(f"Key Error: {e}")
-            ipv4Address = ""
+            ipv4_address = ""
         except TypeError:
-            ipv4Address = ""
+            ipv4_address = ""
 
-        instanceConfig = instance["config"]
-        architecture = instanceConfig.get("image.architecture", "")
-        os_ = instanceConfig.get("image.os", "")
-        release = instanceConfig.get("image.release", "")
+        instance_config = instance["config"]
+        architecture = instance_config.get("image.architecture", "")
+        os_ = instance_config.get("image.os", "")
+        release = instance_config.get("image.release", "")
 
         return {
             "Name": instance["name"],
             "Status": instance["state"]["status"],
-            "IP Address": ipv4Address,
+            "IP Address": ipv4_address,
             "Image": f"{os_}/{release} ({architecture})"
 
         }
     try:
         output = run_lxc(["list", "--format", "json"], show_spinner=True)
         instances = json.loads(output)
-        return list(map(getInfo, instances))
+        return list(map(get_info, instances))
     except YurtCalledProcessException as e:
         raise LXCException(f"Failed to list networks: {e.message}")
 
 
 def start(names: List[str]):
     cmd = ['start'] + names
-    return run_lxc(cmd)
+    return run_lxc(cmd, show_spinner=True)
 
 
 def stop(names: List[str], force=False):
     cmd = ["stop"] + names
     if force:
         cmd.append("--force")
-    return run_lxc(cmd)
+    return run_lxc(cmd, show_spinner=True)
 
 
 def delete(names: List[str], force=False):
