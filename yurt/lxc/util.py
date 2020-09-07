@@ -1,26 +1,33 @@
-import platform
-import os
-import time
-from ipaddress import ip_interface
-import logging
 import json
-from typing import List
+import logging
+import os
+from typing import List, Dict
 
-from yurt.exceptions import LXCException
-from yurt.util import run
 import config
-
+from yurt.exceptions import LXCException
+from yurt.util import run, find
 
 NETWORK_NAME = "yurt-int"
 PROFILE_NAME = "yurt"
+REMOTES = [
+    {
+        "Name": "images",
+        "URL": "https://images.linuxcontainers.org",
+    },
+    {
+        "Name": "ubuntu",
+        "URL": "https://cloud-images.ubuntu.com/releases",
+    },
+]
 
 
 def get_lxc_executable():
-    system = platform.system()
-    if system == "Windows":
+    import platform
+
+    if platform.system() == "Windows":
         return os.path.join(config.bin_dir, "lxc.exe")
     else:
-        raise LXCException("Executable not found for platform")
+        raise LXCException("LXC executable not found for platform")
 
 
 def is_remote_configured():
@@ -40,6 +47,8 @@ def is_profile_configured():
 
 
 def get_ip_config():
+    from ipaddress import ip_interface
+
     host_ip_address = config.get_config(
         config.Key.interface_ip_address)
     network_mask = config.get_config(
@@ -106,6 +115,67 @@ def configure_remote():
     run_lxc(["remote", "add", "yurt", "localhost",
              "--password", "yurtsecret", "--accept-certificate"])
     run_lxc(["remote", "switch", "yurt"])
+
+
+def shortest_alias(aliases: List[Dict[str, str]], remote: str):
+    import re
+
+    aliases = list(map(lambda a: str(a["name"]), aliases))
+    if remote == "ubuntu":
+        aliases = list(filter(lambda a: re.match(
+            r"^\d\d\.\d\d", a), aliases))
+
+    try:
+        alias = aliases[0]
+        for a in aliases:
+            if len(a) < len(alias):
+                alias = a
+        return alias
+    except (IndexError, KeyError) as e:
+        logging.debug(e)
+        logging.error(f"Unexpected alias schema: {aliases}")
+
+
+def filter_remote_images(images: List[Dict]):
+    aliased = filter(lambda i: i["aliases"],  images)
+    container = filter(
+        lambda i: i["type"] == "container", aliased)
+    x64 = filter(
+        lambda i: i["architecture"] == "x86_64", container)
+
+    return x64
+
+
+def get_remote_image_info(remote: str, image: Dict):
+    try:
+        return {
+            "Alias": shortest_alias(image["aliases"], remote),
+            "Description": image["properties"]["description"]
+        }
+    except KeyError as e:
+        logging.debug(e)
+        logging.debug(f"Unexpected image schema: {image}")
+
+
+def get_cached_image_info(image: Dict):
+    try:
+        alias = image["update_source"]["alias"]
+        server = image["update_source"]["server"]
+        remote = find(lambda r: r["URL"] == server, REMOTES, None)
+
+        if remote:
+            source = f"{remote['Name']}:{alias}"
+        else:
+            raise LXCException("Unexpected source server: {}")
+
+        return {
+            "Alias": source,
+            "Description": image["properties"]["description"]
+        }
+
+    except KeyError as e:
+        logging.debug(e)
+        logging.debug(f"Unexpected image schema: {image}")
 
 
 def run_lxc(args: List[str], **kwargs):

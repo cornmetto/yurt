@@ -1,6 +1,7 @@
 import logging
 import os
 from enum import Enum
+import platform
 
 from yurt.exceptions import ConfigReadException, ConfigWriteException
 
@@ -26,7 +27,10 @@ else:
 
 
 try:
-    config_dir = os.path.join(os.environ['HOME'], f"{config_dir_name}")
+    if platform.system() == "Windows":
+        config_dir = os.path.join(os.environ['HOMEPATH'], f"{config_dir_name}")
+    else:
+        config_dir = os.path.join(os.environ['HOME'], f"{config_dir_name}")
 except KeyError:
     import sys
 

@@ -136,9 +136,12 @@ def _run(cmd, stdin=None, capture_output=True, timeout=None, env=None):
     except subprocess.CalledProcessError as e:
         if e.stdout:
             logging.debug(f"{os.path.basename(cmd[0])}: {e.stdout}")
+
+        error_message = "Command failed."
         if e.stderr:
-            logging.error(f"{os.path.basename(cmd[0])}: {e.stderr}")
-        raise YurtCalledProcessException("Operation failed.")
+            logging.debug(f"{os.path.basename(cmd[0])}: {e.stderr}")
+            error_message = e.stderr
+        raise YurtCalledProcessException(error_message)
 
     except subprocess.TimeoutExpired as e:
         logging.debug(e)

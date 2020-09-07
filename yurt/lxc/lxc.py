@@ -108,3 +108,42 @@ def shell(instance: str):
         "--env", r"PS1=\[\033[01;32m\]\u@\h\[\033[00m\]:\[\033[01;34m\]\w\[\033[00m\] \# ",
         "--", "su", "root"],
         capture_output=False)
+
+
+def list_remote_images(remote: str):
+    from functools import partial
+
+    try:
+        output = run_lxc(["image", "list", f"{remote}:",
+                          "--format", "json"], show_spinner=True)
+
+        images = filter_remote_images(json.loads(output))
+
+        images_info = filter(
+            None,
+            map(partial(get_remote_image_info, remote), images)
+        )
+
+        if remote == "ubuntu":
+            return sorted(images_info, key=lambda i: i["Alias"], reverse=True)
+        else:
+            return sorted(images_info, key=lambda i: i["Alias"])
+
+    except YurtCalledProcessException as e:
+        raise LXCException(f"Could not fetch images: {e.message}")
+
+
+def list_cached_images():
+    try:
+        output = run_lxc(["image", "list", "yurt:",
+                          "--format", "json"], show_spinner=True)
+
+        images_info = filter(
+            None, map(get_cached_image_info, json.loads(output)))
+        return list(images_info)
+    except YurtCalledProcessException as e:
+        raise LXCException(f"Could not fetch images - {e.message}")
+
+
+def remotes():
+    return REMOTES

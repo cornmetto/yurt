@@ -1,5 +1,6 @@
 import logging
 import click
+from tabulate import tabulate
 
 import config
 
@@ -18,13 +19,23 @@ def main(verbose):
     """
     Linux Containers for Development.
 
-    Yurt sets up a virtual machine with a pre-configured LXD Server.
-    Services running in the containers can be accessed directly from the
-    host using their assigned IP addresses.
+    Yurt sets up a virtual machine with a pre-configured LXD server.
+    Containers can be accessed directly from the host using the listed IP
+    addresses.
 
     A selection of LXD's commonly used features are exposed through the
     following commands. For help, use either -h or --help on any
     of the commands. e.g 'yurt launch --help'.
+
+
+    EXAMPLES:
+
+    \b
+    $ yurt vm init                          -   Initialize the VM.
+    $ yurt vm start                         -   Start the VM
+    $ yurt launch images:alpine/3.11 c1     -   Launch an alpine/3.11 instances named c1  
+    $ yurt stop c1                          -   Stop instnace c1
+    $ yurt delete c1                        -   Delete instnce c1
 
     """
 
@@ -108,7 +119,7 @@ def start_vm():
 
         if vm_state == vm.State.NotInitialized:
             logging.info(
-                "Yurt VM has not been initialized. Initialze with 'yurt init'.")
+                "Yurt VM has not been initialized. Initialze with 'yurt vm init'.")
         elif vm_state == vm.State.Running:
             logging.info("VM is already running")
         else:
@@ -148,17 +159,30 @@ def vm_info():
 
 
 @main.command()
-@click.argument("image")
+@click.argument("image", metavar="<remote>:<alias>")
 @click.argument("name")
 def launch(image, name):
     """
     Create and start an instance.
 
     \b
-    IMAGE - Image to use as source. Uses <remote>:<alias> LXC syntax.
-            e.g. ubuntu:18.04 or images:alpine/3.11
-            Run 'yurt images' to see all available options.
-    NAME  - Container name
+    <remote>:<alias>    -   Remote and alias of image to use as source.
+                            e.g. ubuntu:18.04 or images:alpine/3.11
+                            Refer to 'yurt remotes' and 'yurt images' for
+                            more information
+    NAME                -   Container name
+
+    \b
+    Instance names must:
+    * be between 1 and 63 characters long
+    * be made up exclusively of letters, numbers and dashes from the ASCII table
+    * not start with a digit or a dash
+    * not end with a dash
+
+    EXAMPLES:
+
+    \b
+    $ yurt launch ubuntu:18.04 c1       -   Create and start an ubuntu 18.04 instance.
 
     """
 
@@ -178,7 +202,7 @@ def start(instances):
     Start a 'Stopped' instance.
     """
 
-    check_variadic_argument(instances)
+    full_help_if_missing(instances)
 
     try:
         check_vm()
@@ -196,7 +220,7 @@ def stop(instances, force):
     """
     Stop an instance.
     """
-    check_variadic_argument(instances)
+    full_help_if_missing(instances)
 
     try:
         check_vm()
@@ -214,7 +238,7 @@ def delete(instances, force):
     """
     Delete an instance.
     """
-    check_variadic_argument(instances)
+    full_help_if_missing(instances)
 
     try:
         check_vm()
@@ -250,8 +274,6 @@ def list_():
     try:
         check_vm()
 
-        from tabulate import tabulate
-
         instances = tabulate(lxc.list_(), headers="keys")
         click.echo(instances)
 
@@ -260,7 +282,7 @@ def list_():
 
 
 @main.command()
-@click.argument('instance', metavar="<instance>")
+@click.argument("instance", metavar="<instance>")
 def shell(instance):
     """
     Start a shell in an instance.
@@ -273,6 +295,57 @@ def shell(instance):
     try:
         check_vm()
         lxc.shell(instance)
+    except YurtException as e:
+        logging.error(e.message)
+
+
+@main.command()
+@click.argument("remote", metavar="<remote>")
+def images(remote):
+    """
+    List images that are available on <remote>.
+
+    Run 'yurt remotes' to view available sources.
+
+    If <remote> is 'cached', images cached on the local server are listed.
+
+    EXAMPLES:
+
+    \b
+    $ yurt images ubuntu        -       List images from 'ubuntu' remote.
+    $ yurt images cached        -       List cached images.
+
+    """
+    try:
+        check_vm()
+
+        if remote == "cached":
+            images = tabulate(
+                lxc.list_cached_images(),
+                headers="keys",
+                disable_numparse=True
+            )
+        else:
+            images = tabulate(
+                lxc.list_remote_images(remote),
+                headers="keys",
+                disable_numparse=True
+            )
+
+        click.echo(images)
+
+    except YurtException as e:
+        logging.error(e.message)
+
+
+@main.command()
+def remotes():
+    """
+    List remotes available for use as image sources.
+    """
+    try:
+        click.echo(tabulate(lxc.remotes(), headers="keys"))
+
     except YurtException as e:
         logging.error(e.message)
 
@@ -295,7 +368,7 @@ def check_vm():
             "The VM is not running. Start it up with 'yurt vm start'")
 
 
-def check_variadic_argument(arg):
+def full_help_if_missing(arg):
     if not arg:
         ctx = click.get_current_context()
         click.echo(ctx.get_help())

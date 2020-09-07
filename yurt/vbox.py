@@ -171,7 +171,7 @@ def destroy_vm(vm_name: str):
     run_vbox(["unregistervm", "--delete", vm_name])
 
 
-def get_vboxmanage_path_windows():
+def get_vboxmanage_executable_windows():
     base_dirs = []
 
     environment_dirs = os.environ.get('VBOX_INSTALL_PATH') \
@@ -195,12 +195,21 @@ def get_vboxmanage_path_windows():
             return path
 
 
+def get_vboxmanage_executable():
+    import platform
+
+    if platform.system() == "Windows":
+        return get_vboxmanage_executable_windows()
+    else:
+        raise VBoxException("VBoxManage executable not found for platform")
+
+
 def run_vbox(args: List[str], **kwargs):
     """
     See yurt.util.run for **kwargs documentation.
     """
 
-    executable = get_vboxmanage_path_windows()
+    executable = get_vboxmanage_executable()
     cmd = [executable, "-q"] + args
 
     try:

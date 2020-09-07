@@ -7,5 +7,8 @@ from .lxc import (
     start,
     stop,
     info,
-    shell
+    shell,
+    list_cached_images,
+    list_remote_images,
+    remotes
 )
