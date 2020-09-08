@@ -71,9 +71,7 @@ def init(appliance_version=None):
         config.set_config(config.Key.vm_name, vm_name)
         _VM_NAME = vm_name
 
-        logging.info(
-            "Installing network interface on host - VirtualBox will ask for permission to do so.")
-        input("Press enter to continue...")
+        input("Installing network interface on host. Press enter to continue...")
         _initialize_network()
 
     except (ConfigWriteException, VBoxException):
@@ -96,7 +94,7 @@ def start():
         vbox.start_vm(_VM_NAME)
 
         util.sleep_for(5, show_spinner=True)
-        logging.info("Network setup...")
+        logging.info("Setting up networking...")
         util.sleep_for(5, show_spinner=True)
 
         current_port = config.get_config(config.Key.ssh_port)
@@ -136,9 +134,8 @@ def destroy():
     try:
         vbox.destroy_vm(_VM_NAME)
         interface_name = config.get_config(config.Key.interface)
-        logging.info(
-            "Removing network interface on host - VirtualBox will ask for permission to do so.")
-        input("Press enter to continue...")
+
+        input("Removing network interface on host. Press enter to continue...")
         vbox.remove_hostonly_interface(interface_name)
 
         _VM_NAME = None

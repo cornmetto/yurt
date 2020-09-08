@@ -13,9 +13,9 @@ CONTEXT_SETTINGS = dict(help_option_names=['-h', '--help'])
 
 
 @click.group(context_settings=CONTEXT_SETTINGS)
-@click.option("-v", "--verbose", is_flag=True, help="Increase verbosity.")
+@click.option("--debug", is_flag=True, help="Increase verbosity.")
 @click.version_option()
-def main(verbose):
+def main(debug):
     """
     Linux Containers for Development.
 
@@ -40,17 +40,19 @@ def main(verbose):
     """
 
     console_handler = logging.StreamHandler()
-    log_formatter = logging.Formatter("-> %(levelname)s-%(name)s: %(message)s")
-    console_handler.setFormatter(log_formatter)
     if config.YURT_ENV == "development":
         logLevel = logging.DEBUG
+        log_formatter = logging.Formatter(
+            "%(levelname)s-%(name)s: %(message)s")
     else:
-        if verbose:
+        log_formatter = logging.Formatter("%(message)s")
+        if debug:
             logLevel = logging.DEBUG
         else:
             console_handler.addFilter(logging.Filter('root'))
             logLevel = logging.INFO
 
+    console_handler.setFormatter(log_formatter)
     logger = logging.getLogger()
     logger.handlers.clear()
     logger.addHandler(console_handler)
@@ -74,6 +76,7 @@ def init():
 
     try:
         vm.init()
+        click.echo("VM successfully initialized.")
     except YurtException as e:
         logging.error(e.message)
 
@@ -109,7 +112,7 @@ def destroy(force):
 
 
 @vm_cmd.command(name="start")
-def start_vm():
+def vm_start():
     """
     Start yurt VM
     """
@@ -119,19 +122,20 @@ def start_vm():
 
         if vm_state == vm.State.NotInitialized:
             logging.info(
-                "Yurt VM has not been initialized. Initialze with 'yurt vm init'.")
+                "The VM has not been initialized. Initialze with 'yurt vm init'.")
         elif vm_state == vm.State.Running:
-            logging.info("VM is already running")
+            logging.info("The VM is already running.")
         else:
             vm.start()
             lxc.ensure_setup_is_complete()
+            click.echo("Yurt has started successfully!")
 
     except YurtException as e:
         logging.error(e.message)
 
 
 @vm_cmd.command(name="stop")
-def stop_vm():
+def vm_stop():
     """
     Shut down yurt VM
     """
@@ -150,7 +154,7 @@ def vm_info():
 
     try:
         for k, v in vm.info().items():
-            print(f"{k}: {v}")
+            click.echo(f"{k}: {v}")
     except YurtException as e:
         logging.error(e.message)
 
@@ -225,7 +229,7 @@ def stop(instances, force):
     try:
         check_vm()
 
-        print(lxc.stop(list(instances), force=force))
+        click.echo(lxc.stop(list(instances), force=force))
 
     except YurtException as e:
         logging.error(e.message)

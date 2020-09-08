@@ -11,7 +11,7 @@ from .util import *  # pylint: disable=unused-wildcard-import
 
 def ensure_setup_is_complete():
     # Usually called immediately after boot. Retry a few times before giving up.
-    logging.info("Making sure LXD is ready...")
+    logging.info("Checking LXD configuration...")
 
     def run_setup_operations():
         if not is_remote_configured():

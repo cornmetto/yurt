@@ -83,10 +83,8 @@ def _setup_port_forwarding(
                         f"{rule_name},tcp,,{host_port},,{guest_port}"]
         remove_rule_cmd = ["controlvm", vm_name, "natpf1", "delete", rule_name]
 
-        logging.info(
-            f"Attempting to set up {rule_name} on port {host_port}...")
         logging.debug(
-            "Setting up forwarding {0},{1}:{2} ...".format(rule_name, host_port, guest_port))
+            f"Setting up forwarding rule: {rule_name},{host_port}:{guest_port} ...")
         try:
             run_vbox(remove_rule_cmd)
         except:
@@ -102,6 +100,7 @@ def _setup_port_forwarding(
         connected = is_service_available_on_port(host_port)
         if not connected:
             retry_count -= 1
+            logging.info(f"Waiting for {rule_name} to become available...")
             time.sleep(retry_wait_time)
             host_port = random.randrange(low_port, high_port)
 
@@ -109,7 +108,7 @@ def _setup_port_forwarding(
         return host_port
     else:
         raise VBoxException(
-            "Set up SSH forwarding but service in guest does not appear to be available.")
+            f"Set up {rule_name} forwarding but service does not appear to be available.")
 
 
 def list_host_only_interfaces():

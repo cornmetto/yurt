@@ -64,12 +64,10 @@ def find(fn, iterable, default):
 
 def _spinner():
     frames = [
-        ".  ",
-        ".. ",
-        "...",
-        " ..",
-        "  .",
-        "   "
+        "-",
+        "\\",
+        "|",
+        "/"
     ]
 
     frame = 0
