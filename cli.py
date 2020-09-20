@@ -9,7 +9,7 @@ from yurt import vm
 from yurt import lxc
 
 
-CONTEXT_SETTINGS = dict(help_option_names=['-h', '--help'])
+CONTEXT_SETTINGS = dict(help_option_names=["-h", "--help"])
 
 
 @click.group(context_settings=CONTEXT_SETTINGS)
@@ -33,7 +33,7 @@ def main(debug):
     \b
     $ yurt vm init                          -   Initialize the VM.
     $ yurt vm start                         -   Start the VM
-    $ yurt launch images:alpine/3.11 c1     -   Launch an alpine/3.11 instances named c1  
+    $ yurt launch images:alpine/3.11 c1     -   Launch an alpine/3.11 instances named c1
     $ yurt stop c1                          -   Stop instnace c1
     $ yurt delete c1                        -   Delete instnce c1
 
@@ -42,14 +42,13 @@ def main(debug):
     console_handler = logging.StreamHandler()
     if config.YURT_ENV == "development":
         logLevel = logging.DEBUG
-        log_formatter = logging.Formatter(
-            "%(levelname)s-%(name)s: %(message)s")
+        log_formatter = logging.Formatter("%(levelname)s-%(name)s: %(message)s")
     else:
         log_formatter = logging.Formatter("%(message)s")
         if debug:
             logLevel = logging.DEBUG
         else:
-            console_handler.addFilter(logging.Filter('root'))
+            console_handler.addFilter(logging.Filter("root"))
             logLevel = logging.INFO
 
     console_handler.setFormatter(log_formatter)
@@ -82,7 +81,12 @@ def init():
 
 
 @vm_cmd.command()
-@click.option("-f", "--force", is_flag=True, help="Delete VM resources belonging to yurt even if destroy fails.")
+@click.option(
+    "-f",
+    "--force",
+    is_flag=True,
+    help="Delete VM resources belonging to yurt even if destroy fails.",
+)
 def destroy(force):
     """
     Delete all resources including the yurt VM.
@@ -92,10 +96,13 @@ def destroy(force):
         vm_state = vm.state()
 
         if vm_state == vm.State.NotInitialized:
-            logging.info("yurt has not been initialized.")
+            logging.info(
+                "The VM has not been initialized. Initialze with 'yurt vm init'."
+            )
         elif vm_state == vm.State.Running:
             logging.error(
-                "Cannot destroy while VM is running. Stop it first with 'yurt vm stop'")
+                "Cannot destroy while VM is running. Stop it first with 'yurt vm stop'"
+            )
         else:
             vm.destroy()
             lxc.destroy()
@@ -105,7 +112,8 @@ def destroy(force):
         else:
             logging.error(e.message)
             logging.info(
-                "Run 'yurt vm delete --force' to force deletion of VM resources belonging to Yurt.")
+                "Run 'yurt vm delete --force' to force deletion of VM resources belonging to Yurt."
+            )
     except Exception:
         if force:
             vm.force_delete_yurt_dir()
@@ -122,7 +130,8 @@ def vm_start():
 
         if vm_state == vm.State.NotInitialized:
             logging.info(
-                "The VM has not been initialized. Initialze with 'yurt vm init'.")
+                "The VM has not been initialized. Initialze with 'yurt vm init'."
+            )
         elif vm_state == vm.State.Running:
             logging.info("The VM is already running.")
         else:
@@ -237,7 +246,9 @@ def stop(instances, force):
 
 @main.command()
 @click.argument("instances", metavar="<instance>...", nargs=-1)
-@click.option("-f", "--force", help="Force deletion of a running instance", is_flag=True)
+@click.option(
+    "-f", "--force", help="Force deletion of a running instance", is_flag=True
+)
 def delete(instances, force):
     """
     Delete an instance.
@@ -291,7 +302,7 @@ def shell(instance):
     """
     Start a shell in an instance.
 
-    This is intended for bootstrapping your instances. It starts a shell 
+    This is intended for bootstrapping your instances. It starts a shell
     as root in <instance>.
     Use it to create and configure users who can SSH using the instance's
     IP address.
@@ -325,15 +336,11 @@ def images(remote):
 
         if remote == "cached":
             images = tabulate(
-                lxc.list_cached_images(),
-                headers="keys",
-                disable_numparse=True
+                lxc.list_cached_images(), headers="keys", disable_numparse=True
             )
         else:
             images = tabulate(
-                lxc.list_remote_images(remote),
-                headers="keys",
-                disable_numparse=True
+                lxc.list_remote_images(remote), headers="keys", disable_numparse=True
             )
 
         click.echo(images)
@@ -366,10 +373,10 @@ def check_vm():
     vm_state = vm.state()
     if vm_state == vm.State.NotInitialized:
         raise YurtException(
-            "The VM has not been initialized. Initialize with 'yurt vm init'")
+            "The VM has not been initialized. Initialize with 'yurt vm init'"
+        )
     if vm_state == vm.State.Stopped:
-        raise YurtException(
-            "The VM is not running. Start it up with 'yurt vm start'")
+        raise YurtException("The VM is not running. Start it up with 'yurt vm start'")
 
 
 def full_help_if_missing(arg):
