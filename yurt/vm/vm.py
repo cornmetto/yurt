@@ -1,5 +1,7 @@
 import logging
 from enum import Enum
+import shutil
+import os
 
 import config
 from yurt import util
@@ -9,6 +11,7 @@ from yurt.exceptions import (
     ConfigWriteException,
     VMException,
     VBoxException,
+    YurtException
 )
 
 _VM_NAME = config.get_config(config.Key.vm_name)
@@ -48,38 +51,53 @@ def info():
     return {"State": "Not Initialized"}
 
 
-def init(appliance_version=None):
+def download_image():
+    if os.path.isfile(config.image) and util.is_sha256(config.image, config.image_sha256):
+        logging.info("Using cached image...")
+    else:
+        logging.info(f"Downloading image from {config.image_url}")
+
+        image_dir = os.path.dirname(config.image)
+        if not os.path.isdir(image_dir):
+            os.mkdir(image_dir)
+
+        util.download_file(
+            config.image_url, config.image, show_progress=True
+        )
+
+        if not util.is_sha256(config.image, config.image_sha256):
+            raise VMException(
+                "Error downloading image. Re-run 'init'.")
+
+
+def init():
     global _VM_NAME
     from uuid import uuid4
-    from os import path
 
-    if not appliance_version:
-        appliance_version = config.appliance_version
-
-    appliance_file = path.join(
-        config.artifacts_dir, "{0}-{1}.ova".format(
-            config.app_name, appliance_version)
-    )
-
-    if state() != State.NotInitialized:
+    if state() is not State.NotInitialized:
         logging.info(
-            "{0} has already been initialized.".format(config.app_name))
+            "The VM has already been initialized.")
         logging.info(
-            "If you need to start over, destroy the existing environment first with `yurt machine destroy`"
+            "If you need to start over, destroy the existing environment first with `yurt vm destroy`"
         )
         return
+
+    download_image()
 
     vm_name = "{0}-{1}".format(config.app_name, uuid4())
 
     try:
         logging.info("Importing appliance...")
-        vbox.import_vm(vm_name, appliance_file, config.vm_install_dir)
+        vbox.import_vm(vm_name, config.image,
+                       config.vm_install_dir, config.vm_memory)
 
         config.set_config(config.Key.vm_name, vm_name)
         _VM_NAME = vm_name
 
-        input("Installing network interface on host. Press enter to continue...")
-        _initialize_network()
+        input("Installing VirtualBox network interface. Press enter to continue...")
+        _setup_network()
+        _attach_config_disk()
+        _attach_storage_pool_disk()
 
     except (ConfigWriteException, VBoxException):
         logging.error("Initialization failed")
@@ -87,6 +105,8 @@ def init(appliance_version=None):
 
 
 def start():
+    from datetime import datetime
+
     vm_state = state()
 
     if vm_state == State.NotInitialized:
@@ -98,15 +118,20 @@ def start():
 
     try:
         logging.info("Starting up...")
-        vbox.start_vm(_VM_NAME)
 
-        util.sleep_for(5, show_spinner=True)
-        logging.info("Setting up networking...")
-        util.sleep_for(5, show_spinner=True)
+        console_file_name = os.path.join(config.vm_install_dir, "console.log")
+        vbox.attach_serial_console(_VM_NAME, console_file_name)
+
+        vbox.start_vm(_VM_NAME)
+        util.sleep_for(10, show_spinner=True)
+        logging.info("Waiting for machine to boot...")
+        util.sleep_for(10, show_spinner=True)
 
         current_port = config.get_config(config.Key.ssh_port)
         host_ssh_port = vbox.setup_ssh_port_forwarding(_VM_NAME, current_port)
         config.set_config(config.Key.ssh_port, host_ssh_port)
+
+        vbox.setup_lxd_port_forwarding(_VM_NAME)
 
     except (VBoxException, ConfigReadException) as e:
         logging.error(e.message)
@@ -130,8 +155,6 @@ def stop():
 
 
 def force_delete_yurt_dir():
-    import shutil
-
     shutil.rmtree(config.config_dir, ignore_errors=True)
 
 
@@ -142,7 +165,7 @@ def destroy():
         vbox.destroy_vm(_VM_NAME)
         interface_name = config.get_config(config.Key.interface)
 
-        input("Removing network interface on host. Press enter to continue...")
+        input("Removing VirtualBox network interface. Press enter to continue...")
         vbox.remove_hostonly_interface(interface_name)
 
         _VM_NAME = None
@@ -152,7 +175,7 @@ def destroy():
         raise VMException("Failed to destroy VM.")
 
 
-def _initialize_network():
+def _setup_network():
     try:
         interface_name = vbox.create_hostonly_interface()
         interface_info = vbox.get_interface_info(interface_name)
@@ -179,3 +202,24 @@ def _initialize_network():
     except VBoxException as e:
         logging.error(e.message)
         raise VMException("Network initialization failed")
+
+
+def _attach_storage_pool_disk():
+    try:
+        vbox.create_disk(
+            config.storage_pool_disk,
+            config.storage_pool_disk_size_mb
+        )
+        vbox.attach_disk(_VM_NAME, config.storage_pool_disk, 2)
+    except VBoxException as e:
+        logging.error(e.message)
+        raise VMException("Storage setup failed")
+
+
+def _attach_config_disk():
+    try:
+        vbox.clone_disk(config.config_disk_source, config.config_disk)
+        vbox.attach_disk(_VM_NAME, config.config_disk, 1)
+    except VBoxException as e:
+        logging.error(e)
+        raise VMException("Failed to attach config disk.")

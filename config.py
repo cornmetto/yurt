@@ -21,16 +21,19 @@ YURT_ENV = os.environ.get("YURT_ENV")
 
 
 if YURT_ENV == "development":
-    config_dir_name = f".{app_name}-dev"
+    _config_dir_name = f".{app_name}-dev"
+elif YURT_ENV == "test":
+    _config_dir_name = f".{app_name}-test"
 else:
-    config_dir_name = f".{app_name}"
+    _config_dir_name = f".{app_name}"
 
 
 try:
     if platform.system() == "Windows":
-        config_dir = os.path.join(os.environ['HOMEPATH'], f"{config_dir_name}")
+        config_dir = os.path.join(
+            os.environ['HOMEPATH'], f"{_config_dir_name}")
     else:
-        config_dir = os.path.join(os.environ['HOME'], f"{config_dir_name}")
+        config_dir = os.path.join(os.environ['HOME'], f"{_config_dir_name}")
 except KeyError:
     import sys
 
@@ -38,21 +41,29 @@ except KeyError:
     sys.exit(1)
 
 
+# VM Configuration ##########################################################
+image_url = "https://cloud-images.ubuntu.com/releases/bionic/release-20200922/ubuntu-18.04-server-cloudimg-amd64.ova"
+image_sha256 = "015616de6eea3cde980f6de052bc1c8918e7c401f997327be265359dd541c85d"
+vm_memory = 2048  # MB
+storage_pool_disk_size_mb = 64000  # MB
+ssh_user_name = "yurt"
+
+
+# Instance Paths ############################################################
 _config_file = os.path.join(config_dir, "config.json")
 vm_install_dir = os.path.join(config_dir, "vm")
+image = os.path.join(config_dir, "image",
+                     "ubuntu-18.04-server-cloudimg-amd64.ova")
+storage_pool_disk = os.path.join(vm_install_dir, "yurt-storage-pool.vmdk")
+config_disk = os.path.join(vm_install_dir, "yurt-config.vmdk")
 
 
-# Resource Paths ############################################################
+# Source Paths ##############################################################
 _src_home = os.path.dirname(__file__)
-_provision_dir = os.path.join(_src_home, "provision")
-artifacts_dir = os.path.join(_src_home, "artifacts")
 bin_dir = os.path.join(_src_home, "bin")
-
-
-# SSH #####################################################################
-ssh_user_name = "yurt"
-ssh_private_key_file = os.path.join(_provision_dir, "ssh", "id_rsa_yurt")
-ssh_host_keys_file = os.path.join(config_dir, "known_hosts")
+_provision_dir = os.path.join(_src_home, "provision")
+config_disk_source = os.path.join(_provision_dir, "yurt-config.vmdk")
+ssh_private_key_file = os.path.join(_provision_dir, "id_rsa")
 
 
 # Utilities ###############################################################

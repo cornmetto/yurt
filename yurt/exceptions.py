@@ -11,6 +11,10 @@ class YurtCalledProcessTimeout(YurtException):
     pass
 
 
+class YurtSSHException(YurtException):
+    pass
+
+
 class LXCException(YurtException):
     pass
 

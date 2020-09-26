@@ -9,11 +9,14 @@ from yurt.util import retry, find
 from .util import *  # pylint: disable=unused-wildcard-import
 
 
-def ensure_setup_is_complete():
-    # Usually called immediately after boot. Retry a few times before giving up.
-    logging.info("Checking LXD configuration...")
+def configure_lxd():
+    logging.info("Updating LXD configuration...")
 
-    def run_setup_operations():
+    if not is_initialized():
+        logging.info("Initializing LXD.")
+        initialize_lxd()
+
+    def check_config():
         if not is_remote_configured():
             configure_remote()
         if not is_network_configured():
@@ -21,7 +24,7 @@ def ensure_setup_is_complete():
         if not is_profile_configured():
             configure_profile()
 
-    retry(run_setup_operations, retries=6, wait_time=5)
+    retry(check_config, retries=10, wait_time=6)
 
 
 def destroy():
@@ -96,7 +99,7 @@ def launch(image: str, name: str):
     #   - Not start with a digit or a dash
     #   - Not end with a dash
 
-    logging.info("This might take a few minutes...")
+    logging.info(f"Launching {name}. This might take a few minutes...")
     run_lxc(["launch", image, name,
              "--profile=default",
              f"--profile={PROFILE_NAME}"], capture_output=False)

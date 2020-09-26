@@ -7,9 +7,8 @@ from yurt.util import is_ssh_available, run, YurtCalledProcessException
 from yurt.exceptions import VBoxException
 
 
-def import_vm(vm_name: str, appliance_file: str, base_folder):
+def import_vm(vm_name: str, appliance_file: str, base_folder, memory):
     settings_file = os.path.join(base_folder, "{}.vbox".format(vm_name))
-    memory = 2048
 
     cmd = [
         "import", appliance_file,
@@ -49,6 +48,13 @@ def get_vm_info(vm_name: str):
     return dict(info_list)
 
 
+def attach_serial_console(vm_name: str, console_file_path: str):
+    cmd1 = ["modifyvm", vm_name, "--uart1", "0x3F8", "4"]
+    cmd2 = ["modifyvm", vm_name, "--uartmode1", "file", console_file_path]
+    run_vbox(cmd1)
+    run_vbox(cmd2)
+
+
 def start_vm(vm_name: str):
     cmd = ["startvm", vm_name, "--type", "headless"]
     run_vbox(cmd, show_spinner=True)
@@ -57,58 +63,6 @@ def start_vm(vm_name: str):
 def stop_vm(vm_name: str):
     cmd = ["controlvm", vm_name, "acpipowerbutton"]
     run_vbox(cmd)
-
-
-def setup_ssh_port_forwarding(vm_name: str, current_port: int):
-    return _setup_port_forwarding(vm_name, "ssh", current_port, 22, is_ssh_available)
-
-
-def _setup_port_forwarding(
-    vm_name: str,
-    rule_name: str,
-    initial_host_port: int,
-    guest_port: int,
-    is_service_available_on_port
-):
-    import time
-    import random
-
-    retry_count, retry_wait_time = (5, 7)
-    low_port, high_port = (4000, 4099)
-    host_port = initial_host_port or low_port
-    connected = is_service_available_on_port(host_port)
-
-    while (retry_count > 0) and not connected:
-        add_rule_cmd = ["controlvm", vm_name, "natpf1",
-                        f"{rule_name},tcp,,{host_port},,{guest_port}"]
-        remove_rule_cmd = ["controlvm", vm_name, "natpf1", "delete", rule_name]
-
-        logging.debug(
-            f"Setting up forwarding rule: {rule_name},{host_port}:{guest_port} ...")
-        try:
-            run_vbox(remove_rule_cmd)
-        except:
-            pass
-
-        try:
-            run_vbox(add_rule_cmd)
-        except VBoxException:
-            raise VBoxException(
-                "An error occurred while setting up SSH")
-
-        time.sleep(2)
-        connected = is_service_available_on_port(host_port)
-        if not connected:
-            retry_count -= 1
-            logging.info(f"Waiting for {rule_name} to become available...")
-            time.sleep(retry_wait_time)
-            host_port = random.randrange(low_port, high_port)
-
-    if connected:
-        return host_port
-    else:
-        raise VBoxException(
-            f"Set up {rule_name} forwarding but service does not appear to be available.")
 
 
 def list_host_only_interfaces():
@@ -163,7 +117,35 @@ def create_hostonly_interface():
 
 
 def remove_hostonly_interface(interface_name: str):
-    run_vbox(["hostonlyif", "remove", f"{interface_name}"])
+    if interface_name:
+        run_vbox(["hostonlyif", "remove", f"{interface_name}"])
+
+
+def create_disk(file_name: str, size_mb: int):
+    run_vbox(
+        [
+            "createmedium", "disk",
+            "--filename", file_name,
+            "--size", str(size_mb),
+            "--format", "VMDK",
+        ]
+    )
+
+
+def attach_disk(vm_name: str, file_name: str, port: int):
+    run_vbox(
+        [
+            "storageattach", vm_name,
+            "--storagectl", "SCSI",
+            "--medium", file_name,
+            "--port", str(port),
+            "--type", "hdd"
+        ]
+    )
+
+
+def clone_disk(src: str, dst: str):
+    run_vbox(["clonemedium", src, dst])
 
 
 def destroy_vm(vm_name: str):
@@ -192,6 +174,8 @@ def get_vboxmanage_executable_windows():
         path = os.path.join(base_dir, "VBoxManage.exe")
         if os.path.exists(path):
             return path
+        else:
+            raise VBoxException("VBoxManage executable not found")
 
 
 def get_vboxmanage_executable():
@@ -200,7 +184,7 @@ def get_vboxmanage_executable():
     if platform.system() == "Windows":
         return get_vboxmanage_executable_windows()
     else:
-        raise VBoxException("VBoxManage executable not found for platform")
+        raise VBoxException("VBoxManage executable not found")
 
 
 def run_vbox(args: List[str], **kwargs):
@@ -215,3 +199,57 @@ def run_vbox(args: List[str], **kwargs):
         return run(cmd, **kwargs)
     except YurtCalledProcessException as e:
         raise VBoxException(e.message)
+
+
+def setup_lxd_port_forwarding(vm_name: str):
+    try:
+        run_vbox(["controlvm", vm_name, "natpf1", "lxd,tcp,,8443,,8443"])
+    except VBoxException as e:
+        logging.debug(e)
+
+
+def setup_ssh_port_forwarding(
+    vm_name: str,
+    initial_host_port: int,
+):
+    import time
+    import random
+
+    rule_name = "ssh"
+    guest_port = 22
+    retry_count, retry_wait_time = (5, 7)
+    low_port, high_port = (4000, 4099)
+    host_port = initial_host_port or low_port
+    connected = is_ssh_available(host_port)
+
+    while (retry_count > 0) and not connected:
+        add_rule_cmd = ["controlvm", vm_name, "natpf1",
+                        f"{rule_name},tcp,,{host_port},,{guest_port}"]
+        remove_rule_cmd = ["controlvm", vm_name, "natpf1", "delete", rule_name]
+
+        logging.debug(
+            f"Setting up forwarding rule: {rule_name},{host_port}:{guest_port} ...")
+        try:
+            run_vbox(remove_rule_cmd)
+        except:
+            pass
+
+        try:
+            run_vbox(add_rule_cmd)
+        except VBoxException:
+            raise VBoxException(
+                "An error occurred while setting up SSH")
+
+        time.sleep(2)
+        connected = is_ssh_available(host_port)
+        if not connected:
+            retry_count -= 1
+            logging.info(f"Waiting for {rule_name}...")
+            time.sleep(retry_wait_time)
+            host_port = random.randrange(low_port, high_port)
+
+    if connected:
+        return host_port
+    else:
+        raise VBoxException(
+            f"Set up {rule_name} forwarding but service does not appear to be available.")

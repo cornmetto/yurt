@@ -11,8 +11,9 @@ autopep8 = "*"
 
 [packages]
 paramiko = "*"
-pylxd = "*"
 tabulate = "*"
+fabric = "*"
+requests = "*"
 
 [requires]
 python_version = "3.8"

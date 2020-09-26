@@ -4,8 +4,8 @@ import os
 from typing import List, Dict
 
 import config
-from yurt.exceptions import LXCException
-from yurt.util import run, find
+from yurt.exceptions import LXCException, YurtSSHException
+from yurt.util import run, run_remote, find
 
 NETWORK_NAME = "yurt-int"
 PROFILE_NAME = "yurt"
@@ -28,6 +28,14 @@ def get_lxc_executable():
         return os.path.join(config.bin_dir, "lxc.exe")
     else:
         raise LXCException("LXC executable not found for platform")
+
+
+def is_initialized():
+    try:
+        run_remote("test -f lxd-initialized")
+        return True
+    except YurtSSHException:
+        return False
 
 
 def is_remote_configured():
@@ -69,6 +77,39 @@ def get_ip_config():
     }
 
 
+def initialize_lxd():
+    lxd_init = """config:
+  core.https_address: '[::]:8443'
+  core.trust_password: yurtsecret
+networks: []
+storage_pools:
+- config:
+    source: /dev/sdc
+  description: ""
+  name: yurtpool
+  driver: zfs
+profiles:
+- config: {}
+  description: ""
+  devices:
+    root:
+      path: /
+      pool: yurtpool
+      type: disk
+  name: default
+cluster: null
+    """
+
+    try:
+        run_remote("sudo snap install lxd")
+        run_remote("sudo lxd.migrate -yes")
+        run_remote("sudo lxd init --preseed", stdin=lxd_init)
+        run_remote("touch lxd-initialized")
+    except YurtSSHException as e:
+        logging.debug(e)
+        raise LXCException("Failed to initialize LXD")
+
+
 def configure_network():
     if is_network_configured():
         print("network is defined")
@@ -104,7 +145,7 @@ devices:
         type: nic
     root:
         path: /
-        pool: yurt
+        pool: yurtpool
         type: disk"""
 
     run_lxc(["profile", "create", PROFILE_NAME])

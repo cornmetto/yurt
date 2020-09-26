@@ -1,6 +1,6 @@
 from .lxc import (
     destroy,
-    ensure_setup_is_complete,
+    configure_lxd,
     launch,
     list_,
     delete,

@@ -42,7 +42,8 @@ def main(debug):
     console_handler = logging.StreamHandler()
     if config.YURT_ENV == "development":
         logLevel = logging.DEBUG
-        log_formatter = logging.Formatter("%(levelname)s-%(name)s: %(message)s")
+        log_formatter = logging.Formatter(
+            "%(levelname)s-%(name)s: %(message)s")
     else:
         log_formatter = logging.Formatter("%(message)s")
         if debug:
@@ -112,7 +113,7 @@ def destroy(force):
         else:
             logging.error(e.message)
             logging.info(
-                "Run 'yurt vm delete --force' to force deletion of VM resources belonging to Yurt."
+                "Run 'yurt vm destroy --force' to force deletion of VM resources belonging to Yurt."
             )
     except Exception:
         if force:
@@ -122,7 +123,7 @@ def destroy(force):
 @vm_cmd.command(name="start")
 def vm_start():
     """
-    Start yurt VM
+    Start the yurt VM
     """
 
     try:
@@ -136,8 +137,8 @@ def vm_start():
             logging.info("The VM is already running.")
         else:
             vm.start()
-            lxc.ensure_setup_is_complete()
-            click.echo("Yurt has started successfully!")
+            lxc.configure_lxd()
+            click.echo("Yurt is ready!")
 
     except YurtException as e:
         logging.error(e.message)
@@ -146,7 +147,7 @@ def vm_start():
 @vm_cmd.command(name="stop")
 def vm_stop():
     """
-    Shut down yurt VM
+    Shut down the yurt VM
     """
 
     try:
@@ -158,7 +159,7 @@ def vm_stop():
 @vm_cmd.command(name="info")
 def vm_info():
     """
-    Show information about the Yurt VM.
+    Show information about the yurt VM.
     """
 
     try:
@@ -274,7 +275,7 @@ def info(instance):
     try:
         check_vm()
 
-        lxc.info(instance)
+        click.echo(lxc.info(instance))
 
     except YurtException as e:
         logging.error(e.message)
@@ -376,7 +377,8 @@ def check_vm():
             "The VM has not been initialized. Initialize with 'yurt vm init'"
         )
     if vm_state == vm.State.Stopped:
-        raise YurtException("The VM is not running. Start it up with 'yurt vm start'")
+        raise YurtException(
+            "The VM is not running. Start it up with 'yurt vm start'")
 
 
 def full_help_if_missing(arg):
