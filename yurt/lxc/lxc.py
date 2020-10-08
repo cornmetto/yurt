@@ -4,16 +4,14 @@ import os
 
 import config
 
-from yurt.exceptions import LXCException, YurtCalledProcessException
+from yurt.exceptions import LXCException, CommandException
 from yurt.util import retry, find
 from .util import *  # pylint: disable=unused-wildcard-import
 
 
 def configure_lxd():
-    logging.info("Updating LXD configuration...")
-
     if not is_initialized():
-        logging.info("Initializing LXD.")
+        logging.info("Initializing LXD...")
         initialize_lxd()
 
     def check_config():
@@ -64,7 +62,7 @@ def list_():
         output = run_lxc(["list", "--format", "json"], show_spinner=True)
         instances = json.loads(output)
         return list(map(get_info, instances))
-    except YurtCalledProcessException as e:
+    except CommandException as e:
         raise LXCException(f"Failed to list networks: {e.message}")
 
 
@@ -132,7 +130,7 @@ def list_remote_images(remote: str):
         else:
             return sorted(images_info, key=lambda i: i["Alias"])
 
-    except YurtCalledProcessException as e:
+    except CommandException as e:
         raise LXCException(f"Could not fetch images: {e.message}")
 
 
@@ -144,7 +142,7 @@ def list_cached_images():
         images_info = filter(
             None, map(get_cached_image_info, json.loads(output)))
         return list(images_info)
-    except YurtCalledProcessException as e:
+    except CommandException as e:
         raise LXCException(f"Could not fetch images - {e.message}")
 
 

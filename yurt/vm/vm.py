@@ -94,14 +94,29 @@ def init():
         config.set_config(config.Key.vm_name, vm_name)
         _VM_NAME = vm_name
 
-        input("Installing VirtualBox network interface. Press enter to continue...")
+        input("""Installing VirtualBox network interface.
+Accept VirtualBox's prompt to allow networking with the host.
+Press enter to continue...""")
+
         _setup_network()
         _attach_config_disk()
         _attach_storage_pool_disk()
 
-    except (ConfigWriteException, VBoxException):
-        logging.error("Initialization failed")
+    except (
+        ConfigWriteException,
+        VBoxException,
+        VMException,
+    ) as e:
+        logging.error(e.message)
+        logging.info("Cleaning up...")
         destroy()
+        delete_instance_files()
+        raise VMException("Initialization failed.")
+    except KeyboardInterrupt:
+        logging.info("\nUser interrupted initialization. Cleaning up.")
+        destroy()
+        delete_instance_files()
+        raise VMException("Initialization failed")
 
 
 def start():
@@ -124,7 +139,7 @@ def start():
 
         vbox.start_vm(_VM_NAME)
         util.sleep_for(10, show_spinner=True)
-        logging.info("Waiting for machine to boot...")
+        logging.info("Waiting...")
         util.sleep_for(10, show_spinner=True)
 
         current_port = config.get_config(config.Key.ssh_port)
@@ -138,14 +153,39 @@ def start():
         raise VMException("Start up failed")
 
 
+def ensure_is_ready():
+    initialize_vm_prompt = "Yurt has not been initialized. Initialize now?"
+    start_vm_prompt = "Yurt is not running. Boot up now?"
+
+    if state() == State.NotInitialized:
+        if util.prompt_user(initialize_vm_prompt, ["yes", "no"]) == "yes":
+            try:
+                init()
+                logging.info("Done.")
+            except YurtException as e:
+                logging.error(e.message)
+        else:
+            raise VMException("Not initialized")
+
+    if state() == State.Stopped:
+        from yurt import lxc
+
+        if util.prompt_user(start_vm_prompt, ["yes", "no"]) == "yes":
+            try:
+                start()
+                lxc.configure_lxd()
+            except YurtException as e:
+                logging.error(e.message)
+        else:
+            raise VMException("Not started")
+
+
 def stop():
     vm_state = state()
 
-    if vm_state == State.NotInitialized:
+    if vm_state != State.Running:
         logging.info(
-            "The VM has not been initialized. Initialize with 'yurt vm init'.")
-    elif vm_state == State.Stopped:
-        logging.info("The VM is not running")
+            "Yurt is not running.")
     else:
         try:
             vbox.stop_vm(_VM_NAME)
@@ -154,8 +194,9 @@ def stop():
             raise VMException("Shut down failed")
 
 
-def force_delete_yurt_dir():
-    shutil.rmtree(config.config_dir, ignore_errors=True)
+def delete_instance_files():
+    shutil.rmtree(config.vm_install_dir, ignore_errors=True)
+    config.clear()
 
 
 def destroy():
@@ -165,7 +206,6 @@ def destroy():
         vbox.destroy_vm(_VM_NAME)
         interface_name = config.get_config(config.Key.interface)
 
-        input("Removing VirtualBox network interface. Press enter to continue...")
         vbox.remove_hostonly_interface(interface_name)
 
         _VM_NAME = None

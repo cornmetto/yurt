@@ -1,10 +1,11 @@
 from .vm import (
-    state,
     State,
+    delete_instance_files,
+    destroy,
+    ensure_is_ready,
     info,
     init,
     start,
+    state,
     stop,
-    force_delete_yurt_dir,
-    destroy
 )

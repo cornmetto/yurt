@@ -3,7 +3,7 @@ import logging
 import re
 from typing import Dict, List
 
-from yurt.util import is_ssh_available, run, YurtCalledProcessException
+from yurt.util import is_ssh_available, run, CommandException
 from yurt.exceptions import VBoxException
 
 
@@ -119,6 +119,9 @@ def create_hostonly_interface():
 def remove_hostonly_interface(interface_name: str):
     if interface_name:
         run_vbox(["hostonlyif", "remove", f"{interface_name}"])
+    else:
+        logging.debug(
+            "vbox.remove_hostonly_interface: Unexpected interface_name 'None'")
 
 
 def create_disk(file_name: str, size_mb: int):
@@ -149,7 +152,10 @@ def clone_disk(src: str, dst: str):
 
 
 def destroy_vm(vm_name: str):
-    run_vbox(["unregistervm", "--delete", vm_name])
+    if vm_name:
+        run_vbox(["unregistervm", "--delete", vm_name])
+    else:
+        logging.debug("vbox.destroy_vm: Unexpected vm_name 'None'.")
 
 
 def get_vboxmanage_executable_windows():
@@ -197,7 +203,7 @@ def run_vbox(args: List[str], **kwargs):
 
     try:
         return run(cmd, **kwargs)
-    except YurtCalledProcessException as e:
+    except CommandException as e:
         raise VBoxException(e.message)
 
 

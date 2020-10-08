@@ -1,9 +1,10 @@
 import logging
 import os
+from typing import List
 
 import config
-from yurt.exceptions import (YurtCalledProcessException, YurtSSHException,
-                             YurtCalledProcessTimeout, YurtException)
+from yurt.exceptions import (CommandException, RemoteCommandException,
+                             CommandTimeout, YurtException)
 
 
 def download_file(url: str, destination: str, show_progress=False):
@@ -71,10 +72,14 @@ def find(fn, iterable, default):
 
 def _spinner():
     frames = [
-        "-",
-        "\\",
-        "|",
-        "/"
+        "⣾",
+        "⣽",
+        "⣻",
+        "⢿",
+        "⡿",
+        "⣟",
+        "⣯",
+        "⣷"
     ]
 
     frame = 0
@@ -88,17 +93,22 @@ def _spinner():
 
 def _render_spinner(spinner, clear=False):
     import sys
+    import shutil
 
+    columns, _ = shutil.get_terminal_size()
+
+    width = columns - 10
     if clear:
-        print(f"\r{' ' * 80}\r", end="", file=sys.stderr)
+        print(f"\r{' ' * width}\r", end="", file=sys.stderr)
     elif spinner:
-        print(f"\r{next(spinner)}\r", end="", file=sys.stderr)
+        print(f"\r  {next(spinner)}{' ' * width} ",
+              end="", file=sys.stderr)
 
 
 def _async_spinner(worker_future):
     import time
 
-    frame_step = 0.1
+    frame_step = 0.075
     spinner = _spinner()
 
     _render_spinner(None, clear=True)
@@ -146,11 +156,11 @@ def _run(cmd, stdin=None, capture_output=True, timeout=None, env=None):
         if e.stderr:
             logging.debug(f"{os.path.basename(cmd[0])}: {e.stderr}")
             error_message = e.stderr
-        raise YurtCalledProcessException(error_message)
+        raise CommandException(error_message)
 
     except subprocess.TimeoutExpired as e:
         logging.debug(e)
-        raise YurtCalledProcessTimeout("Operation timed out.")
+        raise CommandTimeout("Operation timed out.")
 
     except KeyboardInterrupt:
         logging.error("Operation Aborted")
@@ -184,19 +194,19 @@ def _run_remote(cmd, port=None, hide_output=False, stdin=None):
         result = connection.run(cmd, hide=hide_output, in_stream=in_stream)
         return (result.stdout, result.stderr)
     except ssh_exception.NoValidConnectionsError:
-        raise YurtSSHException("SSH connection failed")
+        raise RemoteCommandException("SSH connection failed")
     except ssh_exception.SSHException as e:
         logging.debug(e)
-        raise YurtSSHException("SSH connection failed")
+        raise RemoteCommandException("SSH connection failed")
     except UnexpectedExit as e:
         logging.debug(e)
-        raise YurtSSHException("Command exited with nonzero exit code")
+        raise RemoteCommandException("Command exited with nonzero exit code")
     except Failure as e:
         logging.debug(e)
-        raise YurtSSHException("Command was not completed")
+        raise RemoteCommandException("Command was not completed")
     except ThreadException as e:
         logging.debug(e)
-        raise YurtSSHException(
+        raise RemoteCommandException(
             "Background I/O threads encountered exceptions.")
     finally:
         connection.close()
@@ -208,11 +218,11 @@ def is_ssh_available(port):
     try:
         _run_remote("hostname", hide_output=True, port=port)
         return True
-    except YurtSSHException:
+    except RemoteCommandException:
         return False
 
 
-def run(cmd, show_spinner=False, **kwargs):
+def run(cmd: List[str], show_spinner: bool = False, **kwargs):
     """
     Run a command.
     - cmd: List[str]
@@ -237,7 +247,7 @@ def run(cmd, show_spinner=False, **kwargs):
         return _run(cmd, **kwargs)
 
 
-def run_remote(cmd: str, show_spinner=False, stdin=None):
+def run_remote(cmd: str, show_spinner: bool = False, stdin=None):
     """
     Run a command in the VM over SSH.
     """
@@ -261,3 +271,20 @@ def random_string():
 
     alphabet = string.ascii_lowercase + string.digits
     return ''.join(random.choices(alphabet, k=10))
+
+
+def prompt_user(message: str, options: List[str] = None):
+    try:
+        if options:
+            options_str = "/".join(options)
+            user_input = input(f"{message} [{options_str}] ")
+            choice = find(lambda o: o.lower() ==
+                          user_input.lower(), options, None)
+            if not choice:
+                raise YurtException(f"Unexpected response: {user_input}")
+            return choice
+        else:
+            return input(message)
+
+    except KeyboardInterrupt:
+        raise YurtException("User Canceled")

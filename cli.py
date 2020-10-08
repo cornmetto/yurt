@@ -20,20 +20,21 @@ def main(debug):
     Linux Containers for Development.
 
     Yurt sets up a virtual machine with a pre-configured LXD server.
-    Containers can be accessed directly from the host using the listed IP
-    addresses.
+    Services in containers can be accessed directly from the host using
+    the listed IP addresses. See 'yurt list'.
 
     A selection of LXD's commonly used features are exposed through the
     following commands. For help, use either -h or --help on any
     of the commands. e.g 'yurt launch --help'.
 
+    For simplicity, only images at https://images.linuxcontainers.org are
+    supported at this time.
+
 
     EXAMPLES:
 
     \b
-    $ yurt vm init                          -   Initialize the VM.
-    $ yurt vm start                         -   Start the VM
-    $ yurt launch images:alpine/3.11 c1     -   Launch an alpine/3.11 instances named c1
+    $ yurt launch alpine/3.11 c1     -   Launch an alpine/3.11 instances named c1
     $ yurt stop c1                          -   Stop instnace c1
     $ yurt delete c1                        -   Delete instnce c1
 
@@ -59,29 +60,7 @@ def main(debug):
     logger.setLevel(logLevel)
 
 
-# VM #################################################################
-@main.group(name="vm")
-def vm_cmd():
-    """
-    Manage the Yurt VM.
-    """
-    pass
-
-
-@vm_cmd.command()
-def init():
-    """
-    Initialize yurt VM.
-    """
-
-    try:
-        vm.init()
-        click.echo("VM successfully initialized.")
-    except YurtException as e:
-        logging.error(e.message)
-
-
-@vm_cmd.command()
+@main.command()
 @click.option(
     "-f",
     "--force",
@@ -90,7 +69,7 @@ def init():
 )
 def destroy(force):
     """
-    Delete all resources including the yurt VM.
+    Destroy the Yurt VM. Deletes all resources.
     """
 
     try:
@@ -98,7 +77,7 @@ def destroy(force):
 
         if vm_state == vm.State.NotInitialized:
             logging.info(
-                "The VM has not been initialized. Initialze with 'yurt vm init'."
+                "The VM has not been initialized. Initialize with 'yurt vm init'."
             )
         elif vm_state == vm.State.Running:
             logging.error(
@@ -109,7 +88,7 @@ def destroy(force):
             lxc.destroy()
     except YurtException as e:
         if force:
-            vm.force_delete_yurt_dir()
+            vm.delete_instance_files()
         else:
             logging.error(e.message)
             logging.info(
@@ -117,37 +96,13 @@ def destroy(force):
             )
     except Exception:
         if force:
-            vm.force_delete_yurt_dir()
+            vm.delete_instance_files()
 
 
-@vm_cmd.command(name="start")
-def vm_start():
+@main.command()
+def shutdown():
     """
-    Start the yurt VM
-    """
-
-    try:
-        vm_state = vm.state()
-
-        if vm_state == vm.State.NotInitialized:
-            logging.info(
-                "The VM has not been initialized. Initialze with 'yurt vm init'."
-            )
-        elif vm_state == vm.State.Running:
-            logging.info("The VM is already running.")
-        else:
-            vm.start()
-            lxc.configure_lxd()
-            click.echo("Yurt is ready!")
-
-    except YurtException as e:
-        logging.error(e.message)
-
-
-@vm_cmd.command(name="stop")
-def vm_stop():
-    """
-    Shut down the yurt VM
+    Shutdown the yurt VM.
     """
 
     try:
@@ -156,35 +111,22 @@ def vm_stop():
         logging.error(e.message)
 
 
-@vm_cmd.command(name="info")
-def vm_info():
-    """
-    Show information about the yurt VM.
-    """
-
-    try:
-        for k, v in vm.info().items():
-            click.echo(f"{k}: {v}")
-    except YurtException as e:
-        logging.error(e.message)
-
-
 # Instances #############################################################
 
 
 @main.command()
-@click.argument("image", metavar="<remote>:<alias>")
+@click.argument("image", metavar="<alias>")
 @click.argument("name")
 def launch(image, name):
     """
     Create and start an instance.
 
     \b
-    <remote>:<alias>    -   Remote and alias of image to use as source.
-                            e.g. ubuntu:18.04 or images:alpine/3.11
-                            Refer to 'yurt remotes' and 'yurt images' for
-                            more information
-    NAME                -   Container name
+    <alias>     -   Alias of image to use as source. e.g. ubuntu/18.04 or
+                    alpine/3.11.
+                    Only images in https://images.linuxcontainers.org
+                    are supported at this time. Run 'yurt images' to list them.
+    NAME        -   Instance name
 
     \b
     Instance names must:
@@ -196,14 +138,14 @@ def launch(image, name):
     EXAMPLES:
 
     \b
-    $ yurt launch ubuntu:18.04 c1       -   Create and start an ubuntu 18.04 instance.
+    $ yurt launch ubuntu/18.04 c1       -   Create and start an ubuntu 18.04 instance.
 
     """
 
     try:
-        check_vm()
+        vm.ensure_is_ready()
 
-        lxc.launch(image, name)
+        lxc.launch(f"images:{image}", name)
 
     except YurtException as e:
         logging.error(e.message)
@@ -219,7 +161,7 @@ def start(instances):
     full_help_if_missing(instances)
 
     try:
-        check_vm()
+        vm.ensure_is_ready()
 
         lxc.start(list(instances))
 
@@ -237,7 +179,7 @@ def stop(instances, force):
     full_help_if_missing(instances)
 
     try:
-        check_vm()
+        vm.ensure_is_ready()
 
         click.echo(lxc.stop(list(instances), force=force))
 
@@ -257,7 +199,7 @@ def delete(instances, force):
     full_help_if_missing(instances)
 
     try:
-        check_vm()
+        vm.ensure_is_ready()
 
         lxc.delete(list(instances), force=force)
 
@@ -266,17 +208,14 @@ def delete(instances, force):
 
 
 @main.command()
-@click.argument("instance", metavar="<instance>")
-def info(instance):
+def info():
     """
-    Show information about an instance.
+    Show information about the Yurt VM.
     """
-
     try:
-        check_vm()
-
-        click.echo(lxc.info(instance))
-
+        vm.ensure_is_ready()
+        for k, v in vm.info().items():
+            click.echo(f"{k}: {v}")
     except YurtException as e:
         logging.error(e.message)
 
@@ -288,10 +227,14 @@ def list_():
     """
 
     try:
-        check_vm()
+        vm.ensure_is_ready()
 
         instances = tabulate(lxc.list_(), headers="keys")
-        click.echo(instances)
+        if instances:
+            click.echo(instances)
+        else:
+            click.echo(
+                "No instances found. Create one with 'yurt launch <image> <name>'")
 
     except YurtException as e:
         logging.error(e.message)
@@ -309,33 +252,25 @@ def shell(instance):
     IP address.
     """
     try:
-        check_vm()
+        vm.ensure_is_ready()
         lxc.shell(instance)
     except YurtException as e:
         logging.error(e.message)
 
 
 @main.command()
-@click.argument("remote", metavar="<remote>")
-def images(remote):
+@click.option("-c", "--cached", is_flag=True, help="List cached images only.")
+def images(cached):
     """
-    List images that are available on <remote>.
+    List available images.
 
-    Run 'yurt remotes' to view available sources.
-
-    If <remote> is 'cached', images cached on the local server are listed.
-
-    EXAMPLES:
-
-    \b
-    $ yurt images ubuntu        -       List images from 'ubuntu' remote.
-    $ yurt images cached        -       List cached images.
-
+    At this time, only images at https://images.linuxcontainers.org are supported.
     """
+    remote = "images"
     try:
-        check_vm()
+        vm.ensure_is_ready()
 
-        if remote == "cached":
+        if cached:
             images = tabulate(
                 lxc.list_cached_images(), headers="keys", disable_numparse=True
             )
@@ -350,36 +285,7 @@ def images(remote):
         logging.error(e.message)
 
 
-@main.command()
-def remotes():
-    """
-    List remotes available for use as image sources.
-    """
-    try:
-        click.echo(tabulate(lxc.remotes(), headers="keys"))
-
-    except YurtException as e:
-        logging.error(e.message)
-
-
 # CLI Utilities ########################################################
-
-
-def check_vm():
-    """
-    Raise YurtException with the appropriate message if the VM is not
-    initialized and running.
-    """
-
-    vm_state = vm.state()
-    if vm_state == vm.State.NotInitialized:
-        raise YurtException(
-            "The VM has not been initialized. Initialize with 'yurt vm init'"
-        )
-    if vm_state == vm.State.Stopped:
-        raise YurtException(
-            "The VM is not running. Start it up with 'yurt vm start'")
-
 
 def full_help_if_missing(arg):
     if not arg:

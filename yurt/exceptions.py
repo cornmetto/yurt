@@ -3,15 +3,15 @@ class YurtException(Exception):
         self.message = message
 
 
-class YurtCalledProcessException(YurtException):
+class CommandException(YurtException):
     pass
 
 
-class YurtCalledProcessTimeout(YurtException):
+class CommandTimeout(YurtException):
     pass
 
 
-class YurtSSHException(YurtException):
+class RemoteCommandException(YurtException):
     pass
 
 
