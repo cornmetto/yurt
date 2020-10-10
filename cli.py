@@ -61,6 +61,20 @@ def main(debug):
 
 
 @main.command()
+def boot():
+    """
+    Start up the Yurt VM.
+    """
+    try:
+        if vm.state() == vm.State.Running:
+            logging.info("Yurt is already running.")
+        else:
+            vm.ensure_is_ready(prompt_init=True, prompt_start=False)
+    except YurtException as e:
+        logging.error(e.message)
+
+
+@main.command()
 @click.option(
     "-f",
     "--force",
@@ -100,15 +114,19 @@ def destroy(force):
 
 
 @main.command()
-def shutdown():
+@click.option("-f", "--force", is_flag=True, help="Force shutdown.")
+def shutdown(force):
     """
     Shutdown the yurt VM.
     """
 
     try:
-        vm.stop()
+        vm.stop(force=force)
     except YurtException as e:
         logging.error(e.message)
+        if not force:
+            logging.info(
+                "Try forcing shutdown with 'yurt shutdown --force'.")
 
 
 # Instances #############################################################
@@ -213,9 +231,10 @@ def info():
     Show information about the Yurt VM.
     """
     try:
-        vm.ensure_is_ready()
         for k, v in vm.info().items():
             click.echo(f"{k}: {v}")
+
+        vm.ensure_is_ready()
     except YurtException as e:
         logging.error(e.message)
 

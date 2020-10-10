@@ -132,14 +132,14 @@ def start():
         return
 
     try:
-        logging.info("Starting up...")
+        logging.info("Booting up...")
 
         console_file_name = os.path.join(config.vm_install_dir, "console.log")
         vbox.attach_serial_console(_VM_NAME, console_file_name)
 
         vbox.start_vm(_VM_NAME)
         util.sleep_for(10, show_spinner=True)
-        logging.info("Waiting...")
+        logging.info("Waiting for the machine to be ready...")
         util.sleep_for(10, show_spinner=True)
 
         current_port = config.get_config(config.Key.ssh_port)
@@ -153,12 +153,18 @@ def start():
         raise VMException("Start up failed")
 
 
-def ensure_is_ready():
+def ensure_is_ready(prompt_init=True, prompt_start=True):
     initialize_vm_prompt = "Yurt has not been initialized. Initialize now?"
     start_vm_prompt = "Yurt is not running. Boot up now?"
 
     if state() == State.NotInitialized:
-        if util.prompt_user(initialize_vm_prompt, ["yes", "no"]) == "yes":
+        if prompt_init:
+            initialize_vm = util.prompt_user(
+                initialize_vm_prompt, ["yes", "no"]) == "yes"
+        else:
+            initialize_vm = True
+
+        if initialize_vm:
             try:
                 init()
                 logging.info("Done.")
@@ -170,7 +176,13 @@ def ensure_is_ready():
     if state() == State.Stopped:
         from yurt import lxc
 
-        if util.prompt_user(start_vm_prompt, ["yes", "no"]) == "yes":
+        if prompt_start:
+            start_vm = util.prompt_user(
+                start_vm_prompt, ["yes", "no"]) == "yes"
+        else:
+            start_vm = True
+
+        if start_vm:
             try:
                 start()
                 lxc.configure_lxd()
@@ -180,15 +192,24 @@ def ensure_is_ready():
             raise VMException("Not started")
 
 
-def stop():
+def stop(force=False):
     vm_state = state()
 
+    def confirm_shutdown():
+        if state() == State.Running:
+            raise VMException("VM is still running.")
+
     if vm_state != State.Running:
-        logging.info(
-            "Yurt is not running.")
+        logging.info("Yurt is not running.")
     else:
         try:
-            vbox.stop_vm(_VM_NAME)
+            if force:
+                logging.info("Forcing shutdown...")
+            else:
+                logging.info("Attempting to shut down gracefully...")
+
+            vbox.stop_vm(_VM_NAME, force=force)
+            util.retry(confirm_shutdown, retries=10, wait_time=3)
         except VBoxException as e:
             logging.error(e.message)
             raise VMException("Shut down failed")

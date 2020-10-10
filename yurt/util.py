@@ -101,7 +101,7 @@ def _render_spinner(spinner, clear=False):
     if clear:
         print(f"\r{' ' * width}\r", end="", file=sys.stderr)
     elif spinner:
-        print(f"\r  {next(spinner)}{' ' * width} ",
+        print(f"\r{next(spinner)}{' ' * width} ",
               end="", file=sys.stderr)
 
 

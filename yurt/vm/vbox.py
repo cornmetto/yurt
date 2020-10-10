@@ -49,10 +49,8 @@ def get_vm_info(vm_name: str):
 
 
 def attach_serial_console(vm_name: str, console_file_path: str):
-    cmd1 = ["modifyvm", vm_name, "--uart1", "0x3F8", "4"]
-    cmd2 = ["modifyvm", vm_name, "--uartmode1", "file", console_file_path]
-    run_vbox(cmd1)
-    run_vbox(cmd2)
+    run_vbox(["modifyvm", vm_name, "--uart1", "0x3F8", "4"])
+    run_vbox(["modifyvm", vm_name, "--uartmode1", "file", console_file_path])
 
 
 def start_vm(vm_name: str):
@@ -60,8 +58,12 @@ def start_vm(vm_name: str):
     run_vbox(cmd, show_spinner=True)
 
 
-def stop_vm(vm_name: str):
-    cmd = ["controlvm", vm_name, "acpipowerbutton"]
+def stop_vm(vm_name: str, force=False):
+    if force:
+        cmd = ["controlvm", vm_name, "poweroff"]
+    else:
+        cmd = ["controlvm", vm_name, "acpipowerbutton"]
+
     run_vbox(cmd)
 
 
