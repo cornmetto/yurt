@@ -180,7 +180,7 @@ def _get_ssh_connection(port=None):
     )
 
 
-def _run_remote(cmd, port=None, hide_output=False, stdin=None):
+def _run_in_vm(cmd, port=None, hide_output=False, stdin=None):
     from paramiko import ssh_exception
     from invoke.exceptions import UnexpectedExit, Failure, ThreadException
     from io import StringIO
@@ -216,7 +216,7 @@ def is_ssh_available(port):
     logging.debug(f"Checking if SSH is available on port: {port}.")
 
     try:
-        _run_remote("hostname", hide_output=True, port=port)
+        _run_in_vm("hostname", hide_output=True, port=port)
         return True
     except RemoteCommandException:
         return False
@@ -247,7 +247,7 @@ def run(cmd: List[str], show_spinner: bool = False, **kwargs):
         return _run(cmd, **kwargs)
 
 
-def run_remote(cmd: str, show_spinner: bool = False, stdin=None):
+def run_in_vm(cmd: str, show_spinner: bool = False, stdin=None):
     """
     Run a command in the VM over SSH.
     """
@@ -256,13 +256,13 @@ def run_remote(cmd: str, show_spinner: bool = False, stdin=None):
 
         with ThreadPoolExecutor(max_workers=2) as executor:
             cmd_future = executor.submit(
-                _run_remote, cmd, hide_output=show_spinner,
+                _run_in_vm, cmd, hide_output=show_spinner,
                 stdin=stdin
             )
             executor.submit(_async_spinner, cmd_future)
             return cmd_future.result()
     else:
-        return _run_remote(cmd, stdin=stdin)
+        return _run_in_vm(cmd, stdin=stdin)
 
 
 def random_string():

@@ -111,6 +111,13 @@ def shell(instance: str):
         capture_output=False)
 
 
+def exec_(instance: str, exec_cmd: List[str]):
+    if exec_cmd:
+        cmd = ["exec", instance, "--"]
+        cmd.extend(exec_cmd)
+        run_lxc(cmd, capture_output=False)
+
+
 def list_remote_images(remote: str):
     from functools import partial
 

@@ -5,7 +5,7 @@ from typing import List, Dict
 
 import config
 from yurt.exceptions import LXCException, RemoteCommandException
-from yurt.util import run, run_remote, find
+from yurt.util import run, run_in_vm, find
 
 NETWORK_NAME = "yurt-int"
 PROFILE_NAME = "yurt"
@@ -32,7 +32,7 @@ def get_lxc_executable():
 
 def is_initialized():
     try:
-        run_remote("test -f lxd-initialized", show_spinner=True)
+        run_in_vm("test -f lxd-initialized", show_spinner=True)
         return True
     except RemoteCommandException:
         return False
@@ -102,18 +102,18 @@ cluster: null
 
     try:
         logging.info("Installing LXD. This might take a few minutes.")
-        run_remote("sudo snap install lxd", show_spinner=True)
+        run_in_vm("sudo snap install lxd", show_spinner=True)
         logging.info("LXD installed. Configuring...")
 
-        run_remote("sudo lxd.migrate -yes", show_spinner=True)
-        run_remote(
+        run_in_vm("sudo lxd.migrate -yes", show_spinner=True)
+        run_in_vm(
             "sudo lxd init --preseed",
             stdin=lxd_init,
             show_spinner=True
         )
         logging.info("Done.")
 
-        run_remote("touch lxd-initialized")
+        run_in_vm("touch lxd-initialized")
     except RemoteCommandException as e:
         logging.debug(e)
         raise LXCException("Failed to initialize LXD")

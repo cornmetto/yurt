@@ -2,6 +2,7 @@ import time
 import logging
 import os
 import unittest
+import platform
 
 from yurt import vm, lxc, util
 from yurt.exceptions import YurtException
@@ -36,3 +37,17 @@ class YurtTest(unittest.TestCase):
             vm.stop()
             time.sleep(10)   # TODO 164
             vm.destroy()
+
+
+def ping(ip_address: str):
+    if platform.system().lower() == "windows":
+        packets_number_option = "-n"
+    else:
+        packets_number_option = "-c"
+    cmd = ["ping", packets_number_option, "1", ip_address]
+
+    try:
+        util.run(cmd)
+        return True
+    except YurtException:
+        return False

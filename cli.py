@@ -95,7 +95,7 @@ def destroy(force):
             )
         elif vm_state == vm.State.Running:
             logging.error(
-                "Cannot destroy while VM is running. Stop it first with 'yurt vm stop'"
+                "Cannot destroy while VM is running. Stop it first with 'yurt shutdown'"
             )
         else:
             vm.destroy()

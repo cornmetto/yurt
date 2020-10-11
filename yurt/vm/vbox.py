@@ -189,7 +189,7 @@ def get_vboxmanage_executable_windows():
 def get_vboxmanage_executable():
     import platform
 
-    if platform.system() == "Windows":
+    if platform.system().lower() == "windows":
         return get_vboxmanage_executable_windows()
     else:
         raise VBoxException("VBoxManage executable not found")
