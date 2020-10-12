@@ -17,6 +17,12 @@ class YurtTest(unittest.TestCase):
         cls.discard_vm = os.environ.get(
             "YURT_TEST_DISCARD_VM_POLICY") == "discard"
 
+        if cls.discard_vm:
+            if vm.state() == vm.State.Running:
+                vm.stop(force=True)
+            if vm.state() == vm.State.Stopped:
+                vm.destroy()
+
         if vm.state() == vm.State.NotInitialized:
             vm.init()
             logging.info("Waiting for VM registration...")
@@ -34,8 +40,7 @@ class YurtTest(unittest.TestCase):
     @classmethod
     def tearDownClass(cls):
         if cls.discard_vm:
-            vm.stop()
-            time.sleep(10)   # TODO 164
+            vm.stop(force=True)
             vm.destroy()
 
 

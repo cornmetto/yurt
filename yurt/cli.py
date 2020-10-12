@@ -2,11 +2,8 @@ import logging
 import click
 from tabulate import tabulate
 
-import config
-
 from yurt.exceptions import YurtException
-from yurt import vm
-from yurt import lxc
+from yurt import vm, lxc, config
 
 
 CONTEXT_SETTINGS = dict(help_option_names=["-h", "--help"])
@@ -14,7 +11,7 @@ CONTEXT_SETTINGS = dict(help_option_names=["-h", "--help"])
 
 @click.group(context_settings=CONTEXT_SETTINGS)
 @click.option("--debug", is_flag=True, help="Increase verbosity.")
-@click.version_option()
+@click.version_option(version=config.version, prog_name="yurt")
 def main(debug):
     """
     Linux Containers for Development.
@@ -58,6 +55,17 @@ def main(debug):
     logger.handlers.clear()
     logger.addHandler(console_handler)
     logger.setLevel(logLevel)
+
+
+@main.command()
+def init():
+    """
+    Initialize the Yurt VM.
+    """
+    try:
+        vm.ensure_is_ready(prompt_init=False, prompt_start=True)
+    except YurtException as e:
+        logging.error(e.message)
 
 
 @main.command()
@@ -311,3 +319,7 @@ def full_help_if_missing(arg):
         ctx = click.get_current_context()
         click.echo(ctx.get_help())
         ctx.exit()
+
+
+if __name__ == "__main__":
+    main()  # pylint: disable=no-value-for-parameter

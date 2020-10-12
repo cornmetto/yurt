@@ -6,7 +6,7 @@ import platform
 from yurt.exceptions import ConfigReadException, ConfigWriteException
 
 app_name = "yurt"
-appliance_version = "0.1.4"
+version = "0.1.0"
 
 
 class Key(Enum):
@@ -59,11 +59,11 @@ config_disk = os.path.join(vm_install_dir, "yurt-config.vmdk")
 
 
 # Source Paths ##############################################################
-_src_home = os.path.dirname(__file__)
-bin_dir = os.path.join(_src_home, "bin")
-_provision_dir = os.path.join(_src_home, "provision")
-config_disk_source = os.path.join(_provision_dir, "yurt-config.vmdk")
-ssh_private_key_file = os.path.join(_provision_dir, "id_rsa")
+src_home = os.path.join(os.path.dirname(__file__), "..")
+bin_dir = os.path.join(src_home, "bin")
+provision_dir = os.path.join(src_home, "provision")
+config_disk_source = os.path.join(provision_dir, "yurt-config.vmdk")
+ssh_private_key_file = os.path.join(provision_dir, "id_rsa")
 
 
 # Utilities ###############################################################

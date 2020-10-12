@@ -3,8 +3,7 @@ from enum import Enum
 import shutil
 import os
 
-import config
-from yurt import util
+from yurt import util, config
 from . import vbox
 from yurt.exceptions import (
     ConfigReadException,
@@ -97,10 +96,9 @@ def init():
         input("""Installing VirtualBox network interface.
 Accept VirtualBox's prompt to allow networking with the host.
 Press enter to continue...""")
-
-        _setup_network()
         _attach_config_disk()
         _attach_storage_pool_disk()
+        _setup_network()
 
     except (
         ConfigWriteException,
@@ -209,7 +207,7 @@ def stop(force=False):
                 logging.info("Attempting to shut down gracefully...")
 
             vbox.stop_vm(_VM_NAME, force=force)
-            util.retry(confirm_shutdown, retries=10, wait_time=3)
+            util.retry(confirm_shutdown, retries=10, wait_time=5)
         except VBoxException as e:
             logging.error(e.message)
             raise VMException("Shut down failed")

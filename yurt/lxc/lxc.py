@@ -2,8 +2,7 @@ import logging
 from typing import List
 import os
 
-import config
-
+from yurt import config
 from yurt.exceptions import LXCException, CommandException
 from yurt.util import retry, find
 from .util import *  # pylint: disable=unused-wildcard-import

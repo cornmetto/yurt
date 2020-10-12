@@ -3,7 +3,7 @@ import logging
 import os
 from typing import List, Dict
 
-import config
+from yurt import config
 from yurt.exceptions import LXCException, RemoteCommandException
 from yurt.util import run, run_in_vm, find
 

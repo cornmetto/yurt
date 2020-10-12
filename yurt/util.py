@@ -2,7 +2,7 @@ import logging
 import os
 from typing import List
 
-import config
+from yurt import config
 from yurt.exceptions import (CommandException, RemoteCommandException,
                              CommandTimeout, YurtException)
 
