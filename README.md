@@ -3,20 +3,36 @@
 Yurt is a command-line tool for creating and managing linux containers on Windows.
 It runs LXD in a VirtualBox VM and exposes a selection of LXC commands.
 
+
 ## Installation
-
-We don't have a release for general use at this time. You can test out the current functionality by installing using the [pip](https://pip.pypa.io/en/stable/) package manager. As usual, use a [virtual environment](https://docs.python.org/3/library/venv.html) if possible.
-
-```
-pip install git+https://github.com/ckmetto/yurt.git
-```
-
 ### Requirements
 This version of Yurt runs only on Windows.
 
 VirtualBox is required. Download and install it from https://virtualbox.org if you do not already have it installed.
 
 Only Windows 10 and VirtualBox 6 have been tested at this time.
+
+### Install Yurt
+
+We do not have a release for general use yet. You can test out the current functionality by installing using the [pip](https://pip.pypa.io/en/stable/) . As usual, use a [virtual environment](https://docs.python.org/3/library/venv.html) if possible. You can set up one quickly with [pipenv](https://pypi.org/project/pipenv/).
+
+Create and activate a virtual environment. For example, using [pipenv](https://pypi.org/project/pipenv/):
+
+```
+$ mkdir try-yurt
+$ cd ./try-yurt
+$ pipenv --three
+$ pipenv shell
+```
+
+Install yurt:
+```
+$ pip install git+https://github.com/ckmetto/yurt.git
+$ yurt --version
+```
+
+
+
 
 ## Usage
 After installation, yurt needs to be initialized:
