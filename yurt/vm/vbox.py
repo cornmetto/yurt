@@ -187,12 +187,12 @@ def get_vboxmanage_executable_windows():
 
 
 def get_vboxmanage_executable():
-    import platform
+    from yurt import config
 
-    if platform.system().lower() == "windows":
+    if config.platform == "windows":
         return get_vboxmanage_executable_windows()
     else:
-        raise VBoxException("VBoxManage executable not found")
+        raise VBoxException(f"Platform {config.platform} not supported")
 
 
 def run_vbox(args: List[str], **kwargs):

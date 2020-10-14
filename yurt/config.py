@@ -28,8 +28,10 @@ else:
     _config_dir_name = f".{app_name}"
 
 
+system = platform.system().lower()
+
 try:
-    if platform.system() == "Windows":
+    if system == "windows":
         config_dir = os.path.join(
             os.environ['HOMEPATH'], f"{_config_dir_name}")
     else:
