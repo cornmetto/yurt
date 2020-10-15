@@ -28,7 +28,8 @@ def state():
             vm_info = vbox.get_vm_info(_VM_NAME)
             is_running = vm_info["VMState"].strip('"') == "running"
             return State.Running if is_running else State.Stopped
-        except (VBoxException, KeyError):
+        except (VBoxException, KeyError) as e:
+            logging.debug(e)
             raise VMException("An error occurred while fetching VM status.")
     return State.NotInitialized
 
@@ -44,7 +45,8 @@ def info():
                 "Memory": vm_info["memory"],
                 "CPUs": vm_info["cpus"],
             }
-        except (VBoxException, KeyError):
+        except (VBoxException, KeyError) as e:
+            logging.debug(e)
             raise VMException("An error occurred while fetching VM status.")
 
     return {"State": "Not Initialized"}
