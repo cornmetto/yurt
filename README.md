@@ -3,6 +3,7 @@
 Yurt is a command-line tool for creating and managing linux containers on Windows.
 It runs LXD in a VirtualBox VM and exposes a selection of LXC commands.
 
+![Basic Usage](./docs/images/usage.gif)
 
 ## Installation
 ### Requirements
@@ -66,7 +67,7 @@ If you choose 'no', you can start it later with:
 $ yurt boot
 ```
 
-Since this will be the first boot, yurt will install and configure LXD. This is done only on the first boot.
+Since this will be the first boot, yurt will install and configure LXD.
 
 That's it! You are now ready to launch some containers. The containers are assigned with IP addresses that are reachable from the host. At this time we support only images from https://images.linuxcontainers.org/. The following commands create and start alpine and ubuntu containers respectively. 
 
