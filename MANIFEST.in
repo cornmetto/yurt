@@ -1,0 +1,4 @@
+include yurt/bin/lxc.exe
+include yurt/provision/id_rsa
+include yurt/provision/id_rsa.pub
+include yurt/provision/yurt-config.vmdk

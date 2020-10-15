@@ -22,12 +22,16 @@ REMOTES = [
 
 
 def get_lxc_executable():
-    import platform
-
-    if platform.system() == "Windows":
-        return os.path.join(config.bin_dir, "lxc.exe")
+    if config.system == "windows":
+        lxc_executable = os.path.join(config.bin_dir, "lxc.exe")
+        if os.path.isfile(lxc_executable):
+            return lxc_executable
+        else:
+            raise LXCException(
+                f"{lxc_executable} does not exist.")
     else:
-        raise LXCException("LXC executable not found for platform")
+        raise LXCException(
+            f"LXC executable not found for platform: {config.platform}")
 
 
 def is_initialized():
