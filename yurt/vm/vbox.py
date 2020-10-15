@@ -153,6 +153,14 @@ def clone_disk(src: str, dst: str):
     run_vbox(["clonemedium", src, dst])
 
 
+def remove_disk(path: str, delete: bool = False):
+    cmd = ["closemedium", "disk", path]
+
+    if delete:
+        cmd.append("--delete")
+    run_vbox(cmd)
+
+
 def destroy_vm(vm_name: str):
     if vm_name:
         run_vbox(["unregistervm", "--delete", vm_name])
@@ -189,7 +197,7 @@ def get_vboxmanage_executable_windows():
 def get_vboxmanage_executable():
     from yurt import config
 
-    if config.system == "windows":
+    if config.system == config.System.windows:
         return get_vboxmanage_executable_windows()
     else:
         raise VBoxException(f"Platform {config.system} not supported")

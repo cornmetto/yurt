@@ -22,7 +22,7 @@ REMOTES = [
 
 
 def get_lxc_executable():
-    if config.system == "windows":
+    if config.system == config.System.windows:
         lxc_executable = os.path.join(config.bin_dir, "lxc.exe")
         if os.path.isfile(lxc_executable):
             return lxc_executable
@@ -35,11 +35,7 @@ def get_lxc_executable():
 
 
 def is_initialized():
-    try:
-        run_in_vm("test -f lxd-initialized", show_spinner=True)
-        return True
-    except RemoteCommandException:
-        return False
+    return config.get_config(config.Key.is_lxd_initialized)
 
 
 def is_remote_configured():
@@ -105,7 +101,7 @@ cluster: null
     """
 
     try:
-        logging.info("Installing LXD. This might take a few minutes.")
+        logging.info("Installing LXD. This might take a few minutes...")
         run_in_vm("sudo snap install lxd", show_spinner=True)
         logging.info("LXD installed. Configuring...")
 
@@ -116,11 +112,11 @@ cluster: null
             show_spinner=True
         )
         logging.info("Done.")
-
-        run_in_vm("touch lxd-initialized")
+        config.set_config(config.Key.is_lxd_initialized, True)
     except RemoteCommandException as e:
-        logging.debug(e)
-        raise LXCException("Failed to initialize LXD")
+        logging.error(e)
+        logging.info("Restart the VM to try again: 'yurt shutdown; yurt boot'")
+        raise LXCException("Failed to initialize LXD.")
 
 
 def configure_network():

@@ -15,10 +15,13 @@ def configure_lxd():
 
     def check_config():
         if not is_remote_configured():
+            logging.info("Setting up remote...")
             configure_remote()
         if not is_network_configured():
+            logging.info("Configuring network...")
             configure_network()
         if not is_profile_configured():
+            logging.info("Configuring profiles...")
             configure_profile()
 
     retry(check_config, retries=10, wait_time=6)

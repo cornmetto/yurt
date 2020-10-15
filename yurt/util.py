@@ -97,11 +97,12 @@ def _render_spinner(spinner, clear=False):
 
     columns, _ = shutil.get_terminal_size()
 
-    width = columns - 10
+    width = columns - 5
     if clear:
         print(f"\r{' ' * width}\r", end="", file=sys.stderr)
     elif spinner:
-        print(f"\r{next(spinner)}{' ' * width} ",
+        frame = next(spinner)
+        print(f"\r{frame}{' ' * (width - len(frame))}]",
               end="", file=sys.stderr)
 
 

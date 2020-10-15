@@ -209,7 +209,7 @@ def stop(force=False):
                 logging.info("Attempting to shut down gracefully...")
 
             vbox.stop_vm(_VM_NAME, force=force)
-            util.retry(confirm_shutdown, retries=10, wait_time=5)
+            util.retry(confirm_shutdown, retries=6, wait_time=10)
         except VBoxException as e:
             logging.error(e.message)
             raise VMException("Shut down failed")
@@ -281,6 +281,7 @@ def _attach_config_disk():
     try:
         vbox.clone_disk(config.config_disk_source, config.config_disk)
         vbox.attach_disk(_VM_NAME, config.config_disk, 1)
+        vbox.remove_disk(config.config_disk_source)
     except VBoxException as e:
         logging.error(e)
         raise VMException("Failed to attach config disk.")
