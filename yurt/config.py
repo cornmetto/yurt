@@ -28,8 +28,10 @@ else:
     _config_dir_name = f".{app_name}"
 
 
+system = platform.system().lower()
+
 try:
-    if platform.system() == "Windows":
+    if system == "windows":
         config_dir = os.path.join(
             os.environ['HOMEPATH'], f"{_config_dir_name}")
     else:
@@ -59,7 +61,7 @@ config_disk = os.path.join(vm_install_dir, "yurt-config.vmdk")
 
 
 # Source Paths ##############################################################
-src_home = os.path.join(os.path.dirname(__file__), "..")
+src_home = os.path.dirname(__file__)
 bin_dir = os.path.join(src_home, "bin")
 provision_dir = os.path.join(src_home, "provision")
 config_disk_source = os.path.join(provision_dir, "yurt-config.vmdk")

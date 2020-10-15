@@ -2,9 +2,8 @@ import time
 import logging
 import os
 import unittest
-import platform
 
-from yurt import vm, lxc, util
+from yurt import vm, lxc, util, config
 from yurt.exceptions import YurtException
 
 logging.basicConfig(format='%(levelname)s: %(message)s', level="INFO")
@@ -45,7 +44,7 @@ class YurtTest(unittest.TestCase):
 
 
 def ping(ip_address: str):
-    if platform.system().lower() == "windows":
+    if config.system == "windows":
         packets_number_option = "-n"
     else:
         packets_number_option = "-c"
