@@ -31,7 +31,7 @@ def get_lxc_executable():
                 f"{lxc_executable} does not exist.")
     else:
         raise LXCException(
-            f"LXC executable not found for platform: {config.platform}")
+            f"LXC executable not found for platform: {config.system}")
 
 
 def is_initialized():
