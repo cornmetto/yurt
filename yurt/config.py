@@ -2,6 +2,7 @@ import logging
 import os
 from enum import Enum
 import platform
+import sys
 
 from yurt.exceptions import ConfigReadException, ConfigWriteException
 
@@ -15,31 +16,47 @@ class Key(Enum):
     interface_ip_address = 3
     interface_netmask = 4
     ssh_port = 5
+    is_lxd_initialized = 6
+
+
+class System(Enum):
+    windows = 1
+    macos = 2
+    linux = 3
+
+
+_raw_system = platform.system().lower()
+
+if _raw_system == "windows":
+    system = System.windows
+elif _raw_system == "darwin":
+    system = System.macos
+elif _raw_system == "linux":
+    system = System.linux
+else:
+    logging.error(f"Unknown system: {_raw_system}")
+    sys.exit(1)
 
 
 YURT_ENV = os.environ.get("YURT_ENV")
 
 
 if YURT_ENV == "development":
-    _config_dir_name = f".{app_name}-dev"
+    _app_dir_name = f"{app_name}-dev"
 elif YURT_ENV == "test":
-    _config_dir_name = f".{app_name}-test"
+    _app_dir_name = f"{app_name}-test"
 else:
-    _config_dir_name = f".{app_name}"
+    _app_dir_name = f"{app_name}"
 
-
-system = platform.system().lower()
 
 try:
-    if system == "windows":
+    if system == System.windows:
         config_dir = os.path.join(
-            os.environ['HOMEPATH'], f"{_config_dir_name}")
+            os.environ['LOCALAPPDATA'], f"{_app_dir_name}")
     else:
-        config_dir = os.path.join(os.environ['HOME'], f"{_config_dir_name}")
-except KeyError:
-    import sys
-
-    logging.error("HOME environment variable is not set")
+        config_dir = os.path.join(os.environ['HOME'], f".{_app_dir_name}")
+except KeyError as e:
+    logging.error(f"{e} environment variable is not set.")
     sys.exit(1)
 
 

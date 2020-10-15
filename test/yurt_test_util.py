@@ -44,7 +44,7 @@ class YurtTest(unittest.TestCase):
 
 
 def ping(ip_address: str):
-    if config.system == "windows":
+    if config.system == config.System.windows:
         packets_number_option = "-n"
     else:
         packets_number_option = "-c"

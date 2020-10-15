@@ -44,7 +44,8 @@ This downloads and imports a virtual appliance file and may take a few minutes t
 We also install a network interface on your host to allow for direct communication with containers. Accept the User Account Control prompt from VirtualBox when it comes up. Initialization will fail if VirtualBox is denied permission.
 
 
-After initialization, start the VM with:
+After initialization, yurt will ask if you want to boot the VM. Respond with 'yes' to start the boot process.
+If you choose 'no', you can start it later with:
 
 ```
 $ yurt boot
@@ -81,7 +82,7 @@ root@instance1:~ #
 Please create an issue if something does not work for you. Pull requests are welcome. For major changes, please open an issue first to discuss what you would like to change.
 
 ## Acknowledgement
-Yurt is based on ideas, evaluation and prototyping presented by [Collins Metto](http://arks.princeton.edu/ark:/88435/dsp01v692t925s) and motivated by [docker](https://www.docker.com/), [vagrant](https://www.vagrantup.com/), [lxdock](https://github.com/lxdock/lxdock) and, of course, [LXD](https://linuxcontainers.org/lxd/introduction/).
+Yurt is based on ideas, evaluation and prototyping presented by [Collins Metto](http://arks.princeton.edu/ark:/88435/dsp01v692t925s) and is inspired by [docker](https://www.docker.com/), [vagrant](https://www.vagrantup.com/), [lxdock](https://github.com/lxdock/lxdock) and, of course, [LXD](https://linuxcontainers.org/lxd/introduction/).
 
 ## License
 [MIT](https://choosealicense.com/licenses/mit/)
