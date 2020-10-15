@@ -3,6 +3,7 @@
 Yurt is a command-line tool for creating and managing linux containers on Windows.
 It runs LXD in a VirtualBox VM and exposes a selection of LXC commands.
 
+![Basic Usage](./docs/images/usage.gif)
 
 ## Installation
 ### Requirements
@@ -12,25 +13,40 @@ VirtualBox is required. Install from https://virtualbox.org if you do not alread
 
 Only Windows 10 and VirtualBox 6 have been tested at this time.
 
-### Install Yurt
+### Installation
 
-We do not have a release yet. You can test out the current functionality by installing using [pip](https://pip.pypa.io/en/stable/). As usual, a [virtual environment](https://docs.python.org/3/library/venv.html) is recommended. You can set one up quickly with [pipenv](https://pypi.org/project/pipenv/).
+Although we do not have a release yet, you can test out the current functionality using either [pipx](https://pipxproject.github.io/pipx/installation/) or [pip](https://pip.pypa.io/en/stable/). Python 3.6+ is required.
 
-Create and activate a virtual environment. For example, using pipenv:
+#### 1. Using pipx.
+
+Assuming you have already installed [pipx](https://pipxproject.github.io/pipx/installation/):
+```
+$ pipx install git+https://github.com/ckmetto/yurt.git
+```
+
+#### 2. Using pip.
+With [pip](https://pip.pypa.io/en/stable/), a Virtual Environment is recommended. This example uses [pipenv](https://pypi.org/project/pipenv/) to create one:
+
 
 ```
+# Create and activate a Virtual Environment.
+
 $ mkdir try-yurt
 $ cd ./try-yurt
 $ pipenv --three
 $ pipenv shell
+
+
+# Install yurt.
+
+$ pip install git+https://github.com/ckmetto/yurt.git
 ```
 
-Install yurt:
+Yurt should be available on your PATH after installing using either of these options.
 ```
-$ pip install git+https://github.com/ckmetto/yurt.git
 $ yurt --version
 ```
-
+You will have to activate the virtual environment each time you need to use yurt in case you went with option 2.
 
 
 
@@ -51,9 +67,9 @@ If you choose 'no', you can start it later with:
 $ yurt boot
 ```
 
-Since this will be the first boot, yurt will install and configure LXD in the VM. An active internet connection is needed and the operation may take a few minutes. This is done only on the first boot.
+Since this will be the first boot, yurt will install and configure LXD.
 
-That's it! You are now ready to launch some containers. The following commands create and start alpine and ubuntu containers respectively. The containers are assigned with IP addresses that are reachable from the host.
+That's it! You are now ready to launch some containers. The containers are assigned with IP addresses that are reachable from the host. At this time we support only images from https://images.linuxcontainers.org/. The following commands create and start alpine and ubuntu containers respectively. 
 
 ```
 $ yurt launch alpine/3.11 instance1
