@@ -62,6 +62,7 @@ def init():
     """
     Initialize the Yurt VM.
     """
+
     try:
         vm.ensure_is_ready(prompt_init=False, prompt_start=True)
     except YurtException as e:
@@ -73,6 +74,7 @@ def boot():
     """
     Start up the Yurt VM.
     """
+
     try:
         if vm.state() == vm.State.Running:
             logging.info("Yurt is already running.")
@@ -202,6 +204,7 @@ def stop(instances, force):
     """
     Stop an instance.
     """
+
     full_help_if_missing(instances)
 
     try:
@@ -222,6 +225,7 @@ def delete(instances, force):
     """
     Delete an instance.
     """
+
     full_help_if_missing(instances)
 
     try:
@@ -238,6 +242,7 @@ def info():
     """
     Show information about the Yurt VM.
     """
+
     try:
         for k, v in vm.info().items():
             click.echo(f"{k}: {v}")
@@ -278,6 +283,7 @@ def shell(instance):
     Use it to create and configure users who can SSH using the instance's
     IP address.
     """
+
     try:
         vm.ensure_is_ready()
         lxc.shell(instance)
@@ -293,6 +299,7 @@ def images(cached):
 
     At this time, only images at https://images.linuxcontainers.org are supported.
     """
+
     remote = "images"
     try:
         vm.ensure_is_ready()

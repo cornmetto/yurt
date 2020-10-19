@@ -1,13 +1,12 @@
 # Yurt
 
-Yurt is a command-line tool for creating and managing linux containers on Windows.
-It runs LXD in a VirtualBox VM and exposes a selection of LXC commands.
+`yurt` simplifies the setup and management of Linux containers on Windows. It runs [LXD](https://linuxcontainers.org/lxd/introduction/) in a VirtualBox VM and exposes basic container management commands.
 
 ![Basic Usage](./docs/images/usage.gif)
 
 ## Installation
 ### Requirements
-This version of Yurt runs only on Windows.
+This version of Yurt works only on Windows. MacOS support is on the roadmap.
 
 VirtualBox is required. Install from https://virtualbox.org if you do not already have it.
 
@@ -51,7 +50,7 @@ You will have to activate the virtual environment each time you need to use yurt
 
 
 ## Usage
-After installation, initialize yurt with:
+After installation, initialize your instance with:
 
 ```
 $ yurt init
@@ -69,7 +68,7 @@ $ yurt boot
 
 Since this will be the first boot, yurt will install and configure LXD.
 
-That's it! You are now ready to launch some containers. The containers are assigned with IP addresses that are reachable from the host. At this time we support only images from https://images.linuxcontainers.org/. The following commands create and start alpine and ubuntu containers respectively. 
+That's it! You are now ready to launch some containers. At this time we support amd64 images from https://images.linuxcontainers.org/ only. Run `yurt images` to view them.
 
 ```
 $ yurt launch alpine/3.11 instance1
@@ -98,7 +97,7 @@ root@instance1:~ #
 Please create an issue if something does not work for you. Pull requests are welcome. For major changes, please open an issue first to discuss what you would like to change.
 
 ## Acknowledgement
-Yurt is based on ideas, evaluation and prototyping presented by [Collins Metto](http://arks.princeton.edu/ark:/88435/dsp01v692t925s) and is inspired by [docker](https://www.docker.com/), [vagrant](https://www.vagrantup.com/), [lxdock](https://github.com/lxdock/lxdock) and, of course, [LXD](https://linuxcontainers.org/lxd/introduction/).
+Yurt is based on ideas, evaluation and prototyping presented by [Collins Metto](http://arks.princeton.edu/ark:/88435/dsp01v692t925s) and is inspired by [docker](https://www.docker.com/), [vagrant](https://www.vagrantup.com/), [lxdock](https://github.com/lxdock/lxdock) and [LXD](https://linuxcontainers.org/lxd/introduction/).
 
 ## License
 [MIT](https://choosealicense.com/licenses/mit/)
