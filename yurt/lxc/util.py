@@ -2,10 +2,12 @@ import json
 import logging
 import os
 from typing import List, Dict
+import pylxd
 
 from yurt import config
 from yurt.exceptions import LXCException, RemoteCommandException
 from yurt.util import run, run_in_vm, find
+
 
 NETWORK_NAME = "yurt-int"
 PROFILE_NAME = "yurt"
@@ -19,6 +21,10 @@ REMOTES = [
         "URL": "https://cloud-images.ubuntu.com/releases",
     },
 ]
+
+
+def get_pylxd_client(port: int):
+    return pylxd.Client(endpoint=f"http://127.0.0.1:{port}")
 
 
 def get_lxc_executable():

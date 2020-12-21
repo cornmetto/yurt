@@ -15,6 +15,7 @@ paramiko = "*"
 tabulate = "*"
 fabric = "*"
 requests = "*"
+pylxd = "*"
 
 [requires]
 python_version = "3.8"

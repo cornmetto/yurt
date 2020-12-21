@@ -1,3 +1,5 @@
+# pylint: skip-file
+
 import logging
 from typing import List
 import os
@@ -35,37 +37,41 @@ def destroy():
 
 
 def list_():
-    import json
+    def get_ipv4_address(instance):
+        ipv4_address = ""
 
-    def get_info(instance):
+        state = instance.state()
+        if state.network:
+            try:
+                addresses = state.network["eth0"]["addresses"]
+                ipv4_info = find(
+                    lambda a: a["family"] == "inet", addresses, {})
+                ipv4_address = ipv4_info.get("address", "")
+            except KeyError as e:
+                logging.debug(f"Missing instance data: {e}")
+
+        return ipv4_address
+
+    def get_image(instance):
+        config = instance.config
         try:
-            addresses = instance["state"]["network"]["eth0"]["addresses"]
-            ipv4_info = find(lambda a: a["family"] == "inet", addresses, {})
-            ipv4_address = ipv4_info.get("address", "")
+            arch, os_, release = config['image.architecture'], config['image.os'], config['image.release']
+            return f"{os_}/{release} ({arch})"
         except KeyError as e:
-            logging.debug(f"Key Error: {e}")
-            ipv4_address = ""
-        except TypeError:
-            ipv4_address = ""
+            logging.error(e)
+            return ""
 
-        instance_config = instance["config"]
-        architecture = instance_config.get("image.architecture", "")
-        os_ = instance_config.get("image.os", "")
-        release = instance_config.get("image.release", "")
+    client = get_pylxd_client(4242)
+    instances = []
+    for instance in client.instances.all():
+        instances.append({
+            "Name": instance.name,
+            "Status": instance.status,
+            "IP Address": get_ipv4_address(instance),
+            "Image": get_image(instance)
+        })
 
-        return {
-            "Name": instance["name"],
-            "Status": instance["state"]["status"],
-            "IP Address": ipv4_address,
-            "Image": f"{os_}/{release} ({architecture})"
-
-        }
-    try:
-        output = run_lxc(["list", "--format", "json"], show_spinner=True)
-        instances = json.loads(output)
-        return list(map(get_info, instances))
-    except CommandException as e:
-        raise LXCException(f"Failed to list networks: {e.message}")
+    return instances
 
 
 def start(names: List[str]):
