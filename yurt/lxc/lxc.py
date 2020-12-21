@@ -50,7 +50,7 @@ def list_():
             logging.error(e)
             return ""
 
-    client = get_pylxd_client(4242)
+    client = get_pylxd_client(config.lxd_port)
     instances = []
     for instance in client.instances.all():  # pylint: disable=no-member
         instances.append({

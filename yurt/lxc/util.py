@@ -129,7 +129,7 @@ def initialize_lxd():
 
 
 def configure_network():
-    client = get_pylxd_client(4242)
+    client = get_pylxd_client(config.lxd_port)
     if client.networks.exists(NETWORK_NAME):  # pylint: disable=no-member
         return
 
@@ -154,7 +154,7 @@ def configure_network():
 
 
 def configure_profile():
-    client = get_pylxd_client(4242)
+    client = get_pylxd_client(config.lxd_port)
     if client.profiles.exists(PROFILE_NAME):  # pylint: disable=no-member
         return
 

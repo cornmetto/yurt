@@ -3,6 +3,7 @@ import logging
 import re
 from typing import Dict, List
 
+from yurt import config
 from yurt.util import is_ssh_available, run, CommandException
 from yurt.exceptions import VBoxException
 
@@ -195,8 +196,6 @@ def get_vboxmanage_executable_windows():
 
 
 def get_vboxmanage_executable():
-    from yurt import config
-
     if config.system == config.System.windows:
         return get_vboxmanage_executable_windows()
     else:
@@ -219,7 +218,8 @@ def run_vbox(args: List[str], **kwargs):
 
 def setup_lxd_port_forwarding(vm_name: str):
     try:
-        run_vbox(["controlvm", vm_name, "natpf1", "lxd,tcp,,8443,,8443"])
+        run_vbox(["controlvm", vm_name, "natpf1",
+                  f"lxd,tcp,,{config.lxd_port},,80"])
     except VBoxException as e:
         logging.debug(e)
 

@@ -66,6 +66,7 @@ image_sha256 = "8a79978328c7eb25fb86d84967415cea329d5c540b01bea55262f6df61b7fc64
 vm_memory = 2048  # MB
 storage_pool_disk_size_mb = 64000  # MB
 ssh_user_name = "yurt"
+lxd_port = 4242
 
 
 # Instance Paths ############################################################
