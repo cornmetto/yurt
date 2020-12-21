@@ -266,6 +266,35 @@ def run_in_vm(cmd: str, show_spinner: bool = False, stdin=None):
         return _run_in_vm(cmd, stdin=stdin)
 
 
+def put_file(local: str, remote: str, port=None):
+    from paramiko import ssh_exception
+    from invoke.exceptions import UnexpectedExit, Failure, ThreadException
+
+    connection = _get_ssh_connection(port)
+    try:
+        connection.put(local, remote)
+    except ssh_exception.NoValidConnectionsError:
+        raise RemoteCommandException("SSH connection failed")
+    except ssh_exception.SSHException as e:
+        logging.debug(e)
+        raise RemoteCommandException("SSH connection failed")
+    except UnexpectedExit as e:
+        logging.debug(e)
+        raise RemoteCommandException("Command exited with nonzero exit code")
+    except Failure as e:
+        logging.debug(e)
+        raise RemoteCommandException("Command was not completed")
+    except ThreadException as e:
+        logging.debug(e)
+        raise RemoteCommandException(
+            "Background I/O threads encountered exceptions.")
+    except OSError as e:
+        logging.debug(e)
+        raise YurtException(f"File tranfer error: {e}")
+    finally:
+        connection.close()
+
+
 def random_string():
     import string
     import random

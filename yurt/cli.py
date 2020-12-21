@@ -85,6 +85,21 @@ def boot():
 
 
 @main.command()
+@click.option("-f", "--force", is_flag=True, help="Force shutdown.")
+def reboot(force):
+    """
+    Reboot the Yurt VM.
+    """
+
+    try:
+        if vm.state() == vm.State.Running:
+            vm.stop(force=force)
+        vm.ensure_is_ready(prompt_init=True, prompt_start=False)
+    except YurtException as e:
+        logging.error(e.message)
+
+
+@main.command()
 @click.option(
     "-f",
     "--force",

@@ -61,8 +61,8 @@ except KeyError as e:
 
 
 # VM Configuration ##########################################################
-image_url = "https://cloud-images.ubuntu.com/releases/bionic/release-20200922/ubuntu-18.04-server-cloudimg-amd64.ova"
-image_sha256 = "015616de6eea3cde980f6de052bc1c8918e7c401f997327be265359dd541c85d"
+image_url = "https://cloud-images.ubuntu.com/releases/focal/release-20201210/ubuntu-20.04-server-cloudimg-amd64.ova"
+image_sha256 = "8a79978328c7eb25fb86d84967415cea329d5c540b01bea55262f6df61b7fc64"
 vm_memory = 2048  # MB
 storage_pool_disk_size_mb = 64000  # MB
 ssh_user_name = "yurt"
@@ -71,10 +71,10 @@ ssh_user_name = "yurt"
 # Instance Paths ############################################################
 _config_file = os.path.join(config_dir, "config.json")
 vm_install_dir = os.path.join(config_dir, "vm")
-image = os.path.join(config_dir, "image",
-                     "ubuntu-18.04-server-cloudimg-amd64.ova")
+image = os.path.join(config_dir, "image", os.path.basename(image_url))
 storage_pool_disk = os.path.join(vm_install_dir, "yurt-storage-pool.vmdk")
 config_disk = os.path.join(vm_install_dir, "yurt-config.vmdk")
+remote_tmp = "/tmp/yurt"
 
 
 # Source Paths ##############################################################

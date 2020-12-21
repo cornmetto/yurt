@@ -1,5 +1,3 @@
-# pylint: skip-file
-
 import logging
 from typing import List
 import os
@@ -11,20 +9,11 @@ from .util import *  # pylint: disable=unused-wildcard-import
 
 
 def configure_lxd():
-    if not is_initialized():
-        logging.info("Initializing LXD...")
-        initialize_lxd()
+    initialize_lxd()
 
     def check_config():
-        if not is_remote_configured():
-            logging.info("Setting up remote...")
-            configure_remote()
-        if not is_network_configured():
-            logging.info("Configuring network...")
-            configure_network()
-        if not is_profile_configured():
-            logging.info("Configuring profiles...")
-            configure_profile()
+        configure_network()
+        configure_profile()
 
     retry(check_config, retries=10, wait_time=6)
 
@@ -63,7 +52,7 @@ def list_():
 
     client = get_pylxd_client(4242)
     instances = []
-    for instance in client.instances.all():
+    for instance in client.instances.all():  # pylint: disable=no-member
         instances.append({
             "Name": instance.name,
             "Status": instance.status,

@@ -6,7 +6,7 @@ import pylxd
 
 from yurt import config
 from yurt.exceptions import LXCException, RemoteCommandException
-from yurt.util import run, run_in_vm, find
+from yurt.util import run, run_in_vm, put_file, find
 
 
 NETWORK_NAME = "yurt-int"
@@ -24,7 +24,12 @@ REMOTES = [
 
 
 def get_pylxd_client(port: int):
-    return pylxd.Client(endpoint=f"http://127.0.0.1:{port}")
+    try:
+        return pylxd.Client(endpoint=f"http://127.0.0.1:{port}")
+    except pylxd.exceptions.ClientConnectionFailed as e:
+        logging.debug(e)
+        raise LXCException(
+            "Error connecting to LXD. Try rebooting the VM: 'yurt reboot'")
 
 
 def get_lxc_executable():
@@ -48,11 +53,6 @@ def is_remote_configured():
     result = run_lxc(["remote", "list", "--format", "json"])
     remotes = json.loads(result)
     return bool(remotes.get("yurt"))
-
-
-def is_network_configured():
-    networks = json.loads(run_lxc(["network", "list", "--format", "json"]))
-    return NETWORK_NAME in list(map(lambda n: n["name"], networks))
 
 
 def is_profile_configured():
@@ -83,88 +83,98 @@ def get_ip_config():
     }
 
 
+def _setup_yurt_socat():
+    name = "yurt-lxd-socat"
+    run_in_vm("mkdir -p /tmp/yurt")
+    tmp_unit_file = f"/tmp/yurt/{name}.service"
+    installed_unit_file = f"/etc/systemd/system/{name}.service"
+    run_in_vm("sudo apt install socat -y")
+    put_file(os.path.join(config.provision_dir,
+                          f"{name}.service"), tmp_unit_file)
+    run_in_vm(f"sudo cp {tmp_unit_file} {installed_unit_file}")
+    run_in_vm("sudo systemctl daemon-reload")
+    run_in_vm(f"sudo systemctl enable {name}")
+    run_in_vm(f"sudo systemctl start {name}")
+
+
 def initialize_lxd():
-    lxd_init = """config:
-  core.https_address: '[::]:8443'
-  core.trust_password: yurtsecret
-networks: []
-storage_pools:
-- config:
-    source: /dev/sdc
-  description: ""
-  name: yurtpool
-  driver: zfs
-profiles:
-- config: {}
-  description: ""
-  devices:
-    root:
-      path: /
-      pool: yurtpool
-      type: disk
-  name: default
-cluster: null
-    """
+    if is_initialized():
+        return
 
     try:
-        logging.info("Installing LXD. This might take a few minutes...")
-        run_in_vm("sudo snap install lxd", show_spinner=True)
-        logging.info("LXD installed. Configuring...")
+        with open(os.path.join(config.provision_dir, "lxd-init.yaml"), "r") as f:
+            init = f.read()
+    except OSError as e:
+        raise LXCException(f"Error reading lxd-init.yaml {e}")
 
-        run_in_vm("sudo lxd.migrate -yes", show_spinner=True)
+    try:
+        logging.info("Updating package information...")
+        run_in_vm("sudo apt update", show_spinner=True)
+        run_in_vm("sudo usermod yurt -a -G lxd")
+
+        logging.info("Initializing LXD...")
         run_in_vm(
             "sudo lxd init --preseed",
-            stdin=lxd_init,
+            stdin=init,
             show_spinner=True
         )
+        _setup_yurt_socat()
+
         logging.info("Done.")
         config.set_config(config.Key.is_lxd_initialized, True)
     except RemoteCommandException as e:
         logging.error(e)
-        logging.info("Restart the VM to try again: 'yurt shutdown; yurt boot'")
+        logging.info("Restart the VM to try again: 'yurt reboot'")
         raise LXCException("Failed to initialize LXD.")
 
 
 def configure_network():
-    if is_network_configured():
-        print("network is defined")
+    client = get_pylxd_client(4242)
+    if client.networks.exists(NETWORK_NAME):  # pylint: disable=no-member
         return
 
+    logging.info("Configuring network...")
     ip_config = get_ip_config()
     bridge_address = ip_config["bridgeAddress"]
     dhcp_range_low = ip_config["dhcpRangeLow"]
     dhcp_range_high = ip_config["dhcpRangeHigh"]
 
-    run_lxc(["network", "create", NETWORK_NAME,
-             "bridge.external_interfaces=enp0s8",
-             "ipv6.address=none",
-             "ipv4.nat=true",
-             "ipv4.dhcp=true",
-             "ipv4.dhcp.expiry=24h",
-             f"ipv4.address={bridge_address}",
-             f"ipv4.dhcp.ranges={dhcp_range_low}-{dhcp_range_high}",
-             f"dns.domain={config.app_name}"
-             ]
-            )
+    client.networks.create(  # pylint: disable=no-member
+        NETWORK_NAME, description="Yurt Network", type="bridge",
+        config={
+            "bridge.external_interfaces": "enp0s8",
+            "ipv6.address": "none",
+            "ipv4.nat": "true",
+            "ipv4.dhcp": "true",
+            "ipv4.dhcp.expiry": "24h",
+            "ipv4.address": bridge_address,
+            "ipv4.dhcp.ranges": f"{dhcp_range_low}-{dhcp_range_high}",
+            "dns.domain": config.app_name
+        })
 
 
 def configure_profile():
-    profile_config = f"""name: {PROFILE_NAME}
-config: {{}}
-description: Yurt Default Profile
-devices:
-    eth0:
-        name: eth0
-        nictype: bridged
-        parent: {NETWORK_NAME}
-        type: nic
-    root:
-        path: /
-        pool: yurtpool
-        type: disk"""
+    client = get_pylxd_client(4242)
+    if client.profiles.exists(PROFILE_NAME):  # pylint: disable=no-member
+        return
 
-    run_lxc(["profile", "create", PROFILE_NAME])
-    run_lxc(["profile", "edit", PROFILE_NAME], stdin=profile_config)
+    logging.info("Configuring profile...")
+    client.profiles.create(  # pylint: disable=no-member
+        PROFILE_NAME,
+        devices={
+            "eth0": {
+                "name": "eth0",
+                "nictype": "bridged",
+                "parent": NETWORK_NAME,
+                "type": "nic"
+            },
+            "root": {
+                "type": "disk",
+                "pool": "yurtpool",
+                "path": "/"
+            }
+        }
+    )
 
 
 def configure_remote():
