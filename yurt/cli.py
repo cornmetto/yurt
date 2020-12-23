@@ -158,15 +158,14 @@ def shutdown(force):
 
 
 @main.command()
-@click.argument("image", metavar="<alias>")
+@click.argument("image", metavar="<image>")
 @click.argument("name")
 def launch(image, name):
     """
     Create and start an instance.
 
     \b
-    <alias>     -   Alias of image to use as source. e.g. ubuntu/18.04 or
-                    alpine/3.11.
+    <image>     -   Image to use as source. e.g. ubuntu/18.04 or alpine/3.11.
                     Only images in https://images.linuxcontainers.org
                     are supported at this time. Run 'yurt images' to list them.
     NAME        -   Instance name
@@ -188,7 +187,7 @@ def launch(image, name):
     try:
         vm.ensure_is_ready()
 
-        lxc.launch(f"images:{image}", name)
+        lxc.launch("images", image, name)
 
     except YurtException as e:
         logging.error(e.message)

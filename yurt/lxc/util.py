@@ -11,25 +11,38 @@ from yurt.util import run, run_in_vm, put_file, find
 
 NETWORK_NAME = "yurt-int"
 PROFILE_NAME = "yurt"
-REMOTES = [
-    {
+REMOTES = {
+    "images": {
         "Name": "images",
         "URL": "https://images.linuxcontainers.org",
     },
-    {
+    "ubuntu": {
         "Name": "ubuntu",
         "URL": "https://cloud-images.ubuntu.com/releases",
     },
-]
+}
 
 
-def get_pylxd_client(port: int):
+def get_pylxd_client(port: int = None):
+    if not port:
+        port = config.lxd_port
     try:
         return pylxd.Client(endpoint=f"http://127.0.0.1:{port}")
     except pylxd.exceptions.ClientConnectionFailed as e:
         logging.debug(e)
         raise LXCException(
             "Error connecting to LXD. Try rebooting the VM: 'yurt reboot'")
+
+
+def get_instance(name: str):
+    client = get_pylxd_client()
+    try:
+        return client.instances.get(name)  # pylint: disable=no-member
+    except pylxd.exceptions.NotFound:
+        raise LXCException(f"Instance {name} not found.")
+    except pylxd.exceptions.LXDAPIException:
+        raise LXCException(
+            f"Could not fetch instance {name}. API Error.")
 
 
 def get_lxc_executable():
@@ -129,7 +142,7 @@ def initialize_lxd():
 
 
 def configure_network():
-    client = get_pylxd_client(config.lxd_port)
+    client = get_pylxd_client()
     if client.networks.exists(NETWORK_NAME):  # pylint: disable=no-member
         return
 
@@ -154,7 +167,7 @@ def configure_network():
 
 
 def configure_profile():
-    client = get_pylxd_client(config.lxd_port)
+    client = get_pylxd_client()
     if client.profiles.exists(PROFILE_NAME):  # pylint: disable=no-member
         return
 
@@ -227,7 +240,7 @@ def get_cached_image_info(image: Dict):
     try:
         alias = image["update_source"]["alias"]
         server = image["update_source"]["server"]
-        remote = find(lambda r: r["URL"] == server, REMOTES, None)
+        remote = find(lambda r: r["URL"] == server, REMOTES.values(), None)
 
         if remote:
             source = f"{remote['Name']}:{alias}"

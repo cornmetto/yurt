@@ -1,6 +1,7 @@
 import logging
 from typing import List
 import os
+from pylxd.exceptions import LXDAPIException
 
 from yurt import config
 from yurt.exceptions import LXCException, CommandException
@@ -50,7 +51,7 @@ def list_():
             logging.error(e)
             return ""
 
-    client = get_pylxd_client(config.lxd_port)
+    client = get_pylxd_client()
     instances = []
     for instance in client.instances.all():  # pylint: disable=no-member
         instances.append({
@@ -64,29 +65,33 @@ def list_():
 
 
 def start(names: List[str]):
-    cmd = ['start'] + names
-    return run_lxc(cmd, show_spinner=True)
+    for name in names:
+        instance = get_instance(name)
+        try:
+            instance.start()
+        except LXDAPIException as e:
+            raise LXCException(f"Error starting instance: {e}")
 
 
 def stop(names: List[str], force=False):
-    cmd = ["stop"] + names
-    if force:
-        cmd.append("--force")
-    return run_lxc(cmd, show_spinner=True)
+    for name in names:
+        instance = get_instance(name)
+        try:
+            instance.stop()
+        except LXDAPIException as e:
+            raise LXCException(f"Error stopping instance: {e}")
 
 
 def delete(names: List[str], force=False):
-    cmd = ["delete"] + names
-    if force:
-        cmd.append("--force")
-    return run_lxc(cmd)
+    for name in names:
+        instance = get_instance(name)
+        try:
+            instance.delete()
+        except LXDAPIException as e:
+            raise LXCException(f"Error deleting instance: {e}")
 
 
-def info(name: str):
-    return run_lxc(["info", name])
-
-
-def launch(image: str, name: str):
+def launch(remote: str, image: str, name: str):
     # https://linuxcontainers.org/lxd/docs/master/instances
     # Valid instance names must:
     #   - Be between 1 and 63 characters long
@@ -94,10 +99,30 @@ def launch(image: str, name: str):
     #   - Not start with a digit or a dash
     #   - Not end with a dash
 
-    logging.info(f"Launching {name}. This might take a few minutes...")
-    run_lxc(["launch", image, name,
-             "--profile=default",
-             f"--profile={PROFILE_NAME}"], capture_output=False)
+    client = get_pylxd_client()
+    try:
+        server_url = REMOTES[remote]["URL"]
+    except KeyError:
+        raise LXCException(f"Unsupported remote {remote}")
+
+    try:
+        logging.info(f"Launching {name}. This might take a few minutes...")
+        client.instances.create({  # pylint: disable=no-member
+            "name": name,
+            "source": {
+                "type": "image",
+                "alias": image,
+                "mode": "pull",
+                "server": server_url,
+                "protocol": "simplestreams"
+            }
+        },
+            wait=True
+        )
+
+    except LXDAPIException as e:
+        logging.error(e)
+        raise LXCException(f"Failed to launch instance {name}")
 
 
 def shell(instance: str):
@@ -148,7 +173,3 @@ def list_cached_images():
         return list(images_info)
     except CommandException as e:
         raise LXCException(f"Could not fetch images - {e.message}")
-
-
-def remotes():
-    return REMOTES
