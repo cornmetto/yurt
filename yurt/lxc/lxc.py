@@ -107,8 +107,9 @@ def launch(remote: str, image: str, name: str):
 
     try:
         logging.info(f"Launching {name}. This might take a few minutes...")
-        client.instances.create({  # pylint: disable=no-member
+        instance = client.instances.create({  # pylint: disable=no-member
             "name": name,
+            "profiles": [PROFILE_NAME],
             "source": {
                 "type": "image",
                 "alias": image,
@@ -119,7 +120,7 @@ def launch(remote: str, image: str, name: str):
         },
             wait=True
         )
-
+        instance.start()
     except LXDAPIException as e:
         logging.error(e)
         raise LXCException(f"Failed to launch instance {name}")
