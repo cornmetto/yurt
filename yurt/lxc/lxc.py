@@ -141,6 +141,9 @@ def exec_(instance: str, exec_cmd: List[str]):
 
 
 def list_remote_images(remote: str):
+    client = get_pylxd_client()
+    images = client.images.all()  # pylint: disable=no-member
+
     from functools import partial
 
     try:
@@ -164,12 +167,16 @@ def list_remote_images(remote: str):
 
 
 def list_cached_images():
-    try:
-        output = run_lxc(["image", "list", "yurt:",
-                          "--format", "json"], show_spinner=True)
+    def get_cached_image_info(image):
+        try:
+            return {
+                "Alias": image.update_source["alias"],
+                "Description": image.properties["description"]
+            }
+        except KeyError as e:
+            logging.debug(f"Error {e}: Unexpected image schema: {image}")
 
-        images_info = filter(
-            None, map(get_cached_image_info, json.loads(output)))
-        return list(images_info)
-    except CommandException as e:
-        raise LXCException(f"Could not fetch images - {e.message}")
+    client = get_pylxd_client()
+    images = client.images.all()  # pylint: disable=no-member
+    images_info = filter(None, map(get_cached_image_info, images))
+    return list(images_info)

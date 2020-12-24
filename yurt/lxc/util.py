@@ -236,27 +236,6 @@ def get_remote_image_info(remote: str, image: Dict):
         logging.debug(f"Unexpected image schema: {image}")
 
 
-def get_cached_image_info(image: Dict):
-    try:
-        alias = image["update_source"]["alias"]
-        server = image["update_source"]["server"]
-        remote = find(lambda r: r["URL"] == server, REMOTES.values(), None)
-
-        if remote:
-            source = f"{remote['Name']}:{alias}"
-        else:
-            raise LXCException("Unexpected source server: {}")
-
-        return {
-            "Alias": source,
-            "Description": image["properties"]["description"]
-        }
-
-    except KeyError as e:
-        logging.debug(e)
-        logging.debug(f"Unexpected image schema: {image}")
-
-
 def run_lxc(args: List[str], **kwargs):
     """
     See yurt.util.run for **kwargs documentation.
