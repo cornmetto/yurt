@@ -306,25 +306,24 @@ def shell(instance):
 
 
 @main.command()
-@click.option("-c", "--cached", is_flag=True, help="List cached images only.")
-def images(cached):
+@click.option("-r", "--remote", is_flag=True, help="List remote images. Only images at https://images.linuxcontainers.org are supported at this time.")
+def images(remote):
     """
-    List available images.
+    List images.
 
-    At this time, only images at https://images.linuxcontainers.org are supported.
     """
 
-    remote = "images"
+    remote_server = "images"
     try:
         vm.ensure_is_ready()
 
-        if cached:
+        if remote:
             images = tabulate(
-                lxc.list_cached_images(), headers="keys", disable_numparse=True
+                lxc.list_remote_images(remote_server), headers="keys", disable_numparse=True
             )
         else:
             images = tabulate(
-                lxc.list_remote_images(remote), headers="keys", disable_numparse=True
+                lxc.list_cached_images(), headers="keys", disable_numparse=True
             )
 
         click.echo(images)

@@ -141,14 +141,15 @@ def exec_(instance: str, exec_cmd: List[str]):
 
 
 def list_remote_images(remote: str):
-    client = get_pylxd_client()
-    images = client.images.all()  # pylint: disable=no-member
-
     from functools import partial
 
     try:
-        output = run_lxc(["image", "list", f"{remote}:",
-                          "--format", "json"], show_spinner=True)
+        # We'd have to implement simplestreams ourselves as this call is handled
+        # entirely by the client. Let's cheat.
+        output, error = run_in_vm(
+            f"lxc image list {remote}: --format json", show_spinner=True)
+        if error:
+            logging.error(error)
 
         images = filter_remote_images(json.loads(output))
 
