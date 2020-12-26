@@ -127,11 +127,14 @@ def launch(remote: str, image: str, name: str):
 
 
 def shell(instance: str):
-    run_lxc([
-        "exec", instance,
-        "--env", r"PS1=\[\033[01;32m\]\u@\h\[\033[00m\]:\[\033[01;34m\]\w\[\033[00m\] \# ",
-        "--", "su", "root"],
-        capture_output=False)
+    from yurt.lxc import ws
+
+    instance = get_instance(instance)
+    response = instance.raw_interactive_execute(["su", "root"])
+    try:
+        ws.interact(response["ws"], response["control"])
+    except KeyError as e:
+        raise LXCException(f"Missing ws URL {e}")
 
 
 def exec_(instance: str, exec_cmd: List[str]):
