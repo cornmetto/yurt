@@ -142,8 +142,9 @@ def start():
         logging.info("Waiting for the machine to be ready...")
         util.sleep_for(10, show_spinner=True)
 
-        current_port = config.get_config(config.Key.ssh_port)
-        host_ssh_port = vbox.setup_ssh_port_forwarding(_VM_NAME, current_port)
+        current_ssh_port = config.get_config(config.Key.ssh_port)
+        host_ssh_port = vbox.setup_ssh_port_forwarding(
+            _VM_NAME, current_ssh_port)
         config.set_config(config.Key.ssh_port, host_ssh_port)
 
         vbox.setup_lxd_port_forwarding(_VM_NAME)

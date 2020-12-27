@@ -191,8 +191,8 @@ def get_vboxmanage_executable_windows():
         path = os.path.join(base_dir, "VBoxManage.exe")
         if os.path.exists(path):
             return path
-        else:
-            raise VBoxException("VBoxManage executable not found")
+
+    raise VBoxException("VBoxManage executable not found")
 
 
 def get_vboxmanage_executable():

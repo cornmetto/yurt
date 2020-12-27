@@ -16,6 +16,8 @@ tabulate = "*"
 fabric = "*"
 requests = "*"
 pylxd = "*"
+websockets = "*"
+prompt-toolkit = "*"
 
 [requires]
 python_version = "3.8"

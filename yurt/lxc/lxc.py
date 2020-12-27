@@ -127,12 +127,12 @@ def launch(remote: str, image: str, name: str):
 
 
 def shell(instance: str):
-    from yurt.lxc import ws
+    from yurt.lxc import term
 
     instance = get_instance(instance)
     response = instance.raw_interactive_execute(["su", "root"])
     try:
-        ws.interact(response["ws"], response["control"])
+        term.start(response["ws"], response["control"])
     except KeyError as e:
         raise LXCException(f"Missing ws URL {e}")
 
