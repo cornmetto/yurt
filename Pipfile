@@ -17,8 +17,7 @@ fabric = "*"
 requests = "*"
 pylxd = "*"
 websockets = "*"
-prompt-toolkit = "*"
-pyte = "*"
+colorama = "*"
 
 [requires]
 python_version = "3.8"
