@@ -18,6 +18,7 @@ requests = "*"
 pylxd = "*"
 websockets = "*"
 prompt-toolkit = "*"
+pyte = "*"
 
 [requires]
 python_version = "3.8"

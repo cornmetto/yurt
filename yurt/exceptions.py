@@ -19,6 +19,10 @@ class LXCException(YurtException):
     pass
 
 
+class TermException(YurtException):
+    pass
+
+
 class VBoxException(YurtException):
     pass
 

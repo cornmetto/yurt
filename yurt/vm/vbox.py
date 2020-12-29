@@ -199,6 +199,7 @@ def get_vboxmanage_executable():
     if config.system == config.System.windows:
         return get_vboxmanage_executable_windows()
     else:
+        # Issue #2: Support for MacOS.
         raise VBoxException(f"Platform {config.system} not supported")
 
 
