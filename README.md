@@ -80,6 +80,7 @@ instance2  Running   192.168.132.92   Ubuntu/bionic (amd64)
 Run `yurt launch --help` for more information about launching containers and `yurt --help` to explore other commands.
 
 After launching, run `yurt shell <instance> ` to proceed with configuration as you would with any other server.
+At this point, it's best to create and configure a user to SSH with.
 
 ```
 $ yurt shell instance1
@@ -98,7 +99,7 @@ $ export YURT_ENV=development
 $ yurt init
 ```
 
-`YURT_ENV=development` will make yurt set up a dedicated VM for development and will also turn on debug logging. A separate virtual environment is recommended.
+`YURT_ENV=development` will make yurt set up a separate VM for development and will also turn on debug logging.
 
 Please create an issue if something does not work for you. Pull requests are welcome. For major changes, please open an issue first to discuss what you would like to change.
 

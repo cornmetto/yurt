@@ -124,7 +124,6 @@ def destroy(force):
             )
         else:
             vm.destroy()
-            lxc.destroy()
     except YurtException as e:
         if force:
             vm.delete_instance_files()

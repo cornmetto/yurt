@@ -45,32 +45,8 @@ def get_instance(name: str):
             f"Could not fetch instance {name}. API Error.")
 
 
-def get_lxc_executable():
-    if config.system == config.System.windows:
-        lxc_executable = os.path.join(config.bin_dir, "lxc.exe")
-        if os.path.isfile(lxc_executable):
-            return lxc_executable
-        else:
-            raise LXCException(
-                f"{lxc_executable} does not exist.")
-    else:
-        raise LXCException(
-            f"LXC executable not found for platform: {config.system}")
-
-
 def is_initialized():
     return config.get_config(config.Key.is_lxd_initialized)
-
-
-def is_remote_configured():
-    result = run_lxc(["remote", "list", "--format", "json"])
-    remotes = json.loads(result)
-    return bool(remotes.get("yurt"))
-
-
-def is_profile_configured():
-    profiles = json.loads(run_lxc(["profile", "list", "--format", "json"]))
-    return PROFILE_NAME in list(map(lambda p: p["name"], profiles))
 
 
 def get_ip_config():
@@ -190,12 +166,6 @@ def configure_profile():
     )
 
 
-def configure_remote():
-    run_lxc(["remote", "add", "yurt", "localhost",
-             "--password", "yurtsecret", "--accept-certificate"])
-    run_lxc(["remote", "switch", "yurt"])
-
-
 def shortest_alias(aliases: List[Dict[str, str]], remote: str):
     import re
 
@@ -234,18 +204,3 @@ def get_remote_image_info(remote: str, image: Dict):
     except KeyError as e:
         logging.debug(e)
         logging.debug(f"Unexpected image schema: {image}")
-
-
-def run_lxc(args: List[str], **kwargs):
-    """
-    See yurt.util.run for **kwargs documentation.
-    """
-
-    lxc = get_lxc_executable()
-    cmd = [lxc] + args
-
-    lxc_env = {
-        "HOME": config.config_dir
-    }
-
-    return run(cmd, env=lxc_env, **kwargs)

@@ -19,13 +19,6 @@ def configure_lxd():
     retry(check_config, retries=10, wait_time=6)
 
 
-def destroy():
-    import shutil
-
-    lxc_config_dir = os.path.join(config.config_dir, ".config", "lxc")
-    shutil.rmtree(lxc_config_dir, ignore_errors=True)
-
-
 def list_():
     def get_ipv4_address(instance):
         ipv4_address = ""
@@ -127,13 +120,14 @@ def launch(remote: str, image: str, name: str):
 
 
 def shell(instance: str):
-    from yurt.lxc.term import Term
+    from yurt.lxc import term
 
     instance = get_instance(instance)
     response = instance.raw_interactive_execute(["su", "root"])
     try:
-        term = Term(response["ws"], response["control"])
-        term.run()
+
+        ws_url = f"ws://127.0.0.1:{config.lxd_port}{response['ws']}"
+        term.run(ws_url)
     except KeyError as e:
         raise LXCException(f"Missing ws URL {e}")
 
@@ -143,7 +137,6 @@ def exec_(instance: str, exec_cmd: List[str]):
         cmd = ["exec", instance, "--"]
         cmd.extend(exec_cmd)
         run_lxc(cmd, capture_output=False)
-
 
 def list_remote_images(remote: str):
     from functools import partial

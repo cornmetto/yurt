@@ -80,7 +80,6 @@ remote_tmp = "/tmp/yurt"
 
 # Source Paths ##############################################################
 src_home = os.path.dirname(__file__)
-bin_dir = os.path.join(src_home, "bin")
 provision_dir = os.path.join(src_home, "provision")
 config_disk_source = os.path.join(provision_dir, "yurt-config.vmdk")
 ssh_private_key_file = os.path.join(provision_dir, "id_rsa")
