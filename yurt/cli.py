@@ -1,5 +1,6 @@
 import logging
 import click
+import os
 from tabulate import tabulate
 
 from yurt.exceptions import YurtException
@@ -38,23 +39,23 @@ def main(debug):
     """
 
     console_handler = logging.StreamHandler()
-    if config.YURT_ENV == "development":
-        logLevel = logging.DEBUG
+
+    log_level = logging.INFO
+    log_formatter = log_formatter = logging.Formatter("%(message)s")
+
+    if debug:
+        log_level = logging.DEBUG
         log_formatter = logging.Formatter(
             "%(levelname)s-%(name)s: %(message)s")
     else:
-        log_formatter = logging.Formatter("%(message)s")
-        if debug:
-            logLevel = logging.DEBUG
-        else:
-            console_handler.addFilter(logging.Filter("root"))
-            logLevel = logging.INFO
+        os.environ["PYLXD_WARNINGS"] = "none"
+        console_handler.addFilter(logging.Filter("root"))
 
     console_handler.setFormatter(log_formatter)
     logger = logging.getLogger()
     logger.handlers.clear()
     logger.addHandler(console_handler)
-    logger.setLevel(logLevel)
+    logger.setLevel(log_level)
 
 
 @main.command()
@@ -212,8 +213,7 @@ def start(instances):
 
 @main.command()
 @click.argument("instances", metavar="<instance>...", nargs=-1)
-@click.option("-f", "--force", help="Force the instance to shutdown", is_flag=True)
-def stop(instances, force):
+def stop(instances):
     """
     Stop an instance.
     """
@@ -223,7 +223,7 @@ def stop(instances, force):
     try:
         vm.ensure_is_ready()
 
-        click.echo(lxc.stop(list(instances), force=force))
+        click.echo(lxc.stop(list(instances)))
 
     except YurtException as e:
         logging.error(e.message)
@@ -231,10 +231,7 @@ def stop(instances, force):
 
 @main.command()
 @click.argument("instances", metavar="<instance>...", nargs=-1)
-@click.option(
-    "-f", "--force", help="Force deletion of a running instance", is_flag=True
-)
-def delete(instances, force):
+def delete(instances):
     """
     Delete an instance.
     """
@@ -244,7 +241,7 @@ def delete(instances, force):
     try:
         vm.ensure_is_ready()
 
-        lxc.delete(list(instances), force=force)
+        lxc.delete(list(instances))
 
     except YurtException as e:
         logging.error(e.message)
@@ -308,7 +305,7 @@ def shell(instance):
 @click.option("-r", "--remote", is_flag=True, help="List remote images. Only images at https://images.linuxcontainers.org are supported at this time.")
 def images(remote):
     """
-    List images.
+    List images that can be used to launch containers.
 
     """
 

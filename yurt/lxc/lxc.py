@@ -1,9 +1,7 @@
 import logging
 from typing import List
-import os
 from pylxd.exceptions import LXDAPIException
 
-from yurt import config
 from yurt.exceptions import LXCException, CommandException
 from yurt.util import retry, find
 from .util import *  # pylint: disable=unused-wildcard-import
@@ -66,7 +64,7 @@ def start(names: List[str]):
             raise LXCException(f"Error starting instance: {e}")
 
 
-def stop(names: List[str], force=False):
+def stop(names: List[str]):
     for name in names:
         instance = get_instance(name)
         try:
@@ -75,11 +73,11 @@ def stop(names: List[str], force=False):
             raise LXCException(f"Error stopping instance: {e}")
 
 
-def delete(names: List[str], force=False):
+def delete(names: List[str]):
     for name in names:
         instance = get_instance(name)
         try:
-            instance.delete()
+            instance.delete(wait=True)
         except LXDAPIException as e:
             raise LXCException(f"Error deleting instance: {e}")
 
@@ -99,8 +97,9 @@ def launch(remote: str, image: str, name: str):
         raise LXCException(f"Unsupported remote {remote}")
 
     try:
-        logging.info(f"Launching {name}. This might take a few minutes...")
-        instance = client.instances.create({  # pylint: disable=no-member
+        logging.info(
+            f"Launching container {name}. This might take a few minutes...")
+        response = client.api.instances.post(json={
             "name": name,
             "profiles": [PROFILE_NAME],
             "source": {
@@ -110,9 +109,15 @@ def launch(remote: str, image: str, name: str):
                 "server": server_url,
                 "protocol": "simplestreams"
             }
-        },
-            wait=True
+        })
+
+        follow_operation(
+            response.json()["operation"],
+            unpack_metadata=unpack_download_operation_metadata
         )
+
+        logging.info(f"Starting container")
+        instance = get_instance(name)
         instance.start()
     except LXDAPIException as e:
         logging.error(e)
@@ -130,6 +135,7 @@ def shell(instance: str):
 
 def list_remote_images(remote: str):
     from functools import partial
+    import json
 
     try:
         # We'd have to implement simplestreams ourselves as this call is handled

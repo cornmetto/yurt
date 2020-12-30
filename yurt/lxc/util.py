@@ -5,7 +5,7 @@ import pylxd
 
 from yurt import config
 from yurt.exceptions import LXCException, RemoteCommandException
-from yurt.util import run, run_in_vm, put_file, find
+from yurt.util import run_in_vm, put_file
 
 
 NETWORK_NAME = "yurt-int"
@@ -216,3 +216,54 @@ def exec_interactive(instance_name: str, cmd: List[str]):
         term.run(ws_url)
     except KeyError as e:
         raise LXCException(f"Missing ws URL {e}")
+
+
+def unpack_download_operation_metadata(metadata):
+    if metadata:
+        if "download_progress" in metadata:
+            return f"Download progress: {metadata['download_progress']}"
+        if "create_instance_from_image_unpack_progress" in metadata:
+            return f"Unpack progress: {metadata['create_instance_from_image_unpack_progress']}"
+    else:
+        return ""
+
+
+def follow_operation(operation_uri: str, unpack_metadata=None):
+    """
+    Params:
+        operation_uri:      URI of the operation to follow.
+        unpack_metadata:    Function to unpack the operation's metadata. Return a line of text to summarize
+                            the current progress of the operation.
+                            If not given, progress will not be shown.
+    """
+    import time
+    from yurt.util import retry
+
+    operations = get_pylxd_client().operations
+
+    # Allow time for operation to be created.
+    try:
+        retry(
+            lambda: operations.get(operation_uri),  # pylint: disable=no-member
+            retries=10,
+            wait_time=0.5
+        )
+        operation = operations.get(operation_uri)  # pylint: disable=no-member
+    except pylxd.exceptions.NotFound:
+        raise LXCException(
+            f"Timed out while waiting for operation to be created.")
+
+    logging.info(operation.description)
+    while True:
+        try:
+            operation = operations.get(  # pylint: disable=no-member
+                operation_uri
+            )
+            if unpack_metadata:
+                print(f"\r{unpack_metadata(operation.metadata)}", end="")
+            time.sleep(0.5)
+        except pylxd.exceptions.NotFound:
+            print("\nDone")
+            break
+        except KeyboardInterrupt:
+            break

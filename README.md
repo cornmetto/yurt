@@ -99,7 +99,7 @@ $ export YURT_ENV=development
 $ yurt init
 ```
 
-`YURT_ENV=development` will make yurt set up a separate VM for development and will also turn on debug logging.
+`YURT_ENV=development` makes yurt set up a separate VM for development. Remember to set the variable during development.
 
 Please create an issue if something does not work for you. Pull requests are welcome. For major changes, please open an issue first to discuss what you would like to change.
 
