@@ -1,4 +1,3 @@
-import json
 import logging
 import os
 from typing import List, Dict
@@ -204,3 +203,16 @@ def get_remote_image_info(remote: str, image: Dict):
     except KeyError as e:
         logging.debug(e)
         logging.debug(f"Unexpected image schema: {image}")
+
+
+def exec_interactive(instance_name: str, cmd: List[str]):
+    from yurt.lxc import term
+
+    instance = get_instance(instance_name)
+    response = instance.raw_interactive_execute(cmd)
+    try:
+
+        ws_url = f"ws://127.0.0.1:{config.lxd_port}{response['ws']}"
+        term.run(ws_url)
+    except KeyError as e:
+        raise LXCException(f"Missing ws URL {e}")

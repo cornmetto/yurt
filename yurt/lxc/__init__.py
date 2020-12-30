@@ -1,4 +1,5 @@
 from .lxc import (
+    exec_,
     configure_lxd,
     launch,
     list_,

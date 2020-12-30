@@ -80,7 +80,8 @@ class LXCTest(YurtTest):
         lxc.launch("images", "alpine/3.10", instance1_name)
         lxc.launch("images", "alpine/3.10", instance2_name)
 
-        # lxc.exec_(instance1_name, ["ping", "-c1", instance2_name])
+        res = lxc.exec_(instance1_name, ["ping", "-c1", instance2_name])
+        self.assertTrue(res.exit_code == 0)
 
 
 if __name__ == '__main__':

@@ -119,24 +119,14 @@ def launch(remote: str, image: str, name: str):
         raise LXCException(f"Failed to launch instance {name}")
 
 
+def exec_(instance_name: str, cmd: List[str]):
+    instance = get_instance(instance_name)
+    return instance.execute(cmd)
+
+
 def shell(instance: str):
-    from yurt.lxc import term
+    exec_interactive(instance, ["su", "root"])
 
-    instance = get_instance(instance)
-    response = instance.raw_interactive_execute(["su", "root"])
-    try:
-
-        ws_url = f"ws://127.0.0.1:{config.lxd_port}{response['ws']}"
-        term.run(ws_url)
-    except KeyError as e:
-        raise LXCException(f"Missing ws URL {e}")
-
-
-def exec_(instance: str, exec_cmd: List[str]):
-    if exec_cmd:
-        cmd = ["exec", instance, "--"]
-        cmd.extend(exec_cmd)
-        run_lxc(cmd, capture_output=False)
 
 def list_remote_images(remote: str):
     from functools import partial
