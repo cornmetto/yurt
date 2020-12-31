@@ -60,15 +60,10 @@ We also install a network interface on your host to allow for direct communicati
 
 
 After initialization, yurt will ask if you want to boot the VM. Respond with 'yes' to start the boot process.
-If you choose 'no', you can start it later with:
+You can also start it later with `yurt boot`.
 
-```
-$ yurt boot
-```
 
-Since this will be the first boot, yurt will install and configure LXD.
-
-That's it! You are now ready to launch some containers. At this time we support amd64 images from https://images.linuxcontainers.org/ only. Run `yurt images` to view them.
+That's all. You are now ready to launch some containers. At this time we support amd64 images from https://images.linuxcontainers.org/ only. Run `yurt images --remote` to view them.
 
 ```
 $ yurt launch alpine/3.11 instance1
@@ -85,6 +80,7 @@ instance2  Running   192.168.132.92   Ubuntu/bionic (amd64)
 Run `yurt launch --help` for more information about launching containers and `yurt --help` to explore other commands.
 
 After launching, run `yurt shell <instance> ` to proceed with configuration as you would with any other server.
+At this point, it's best to create and configure a user to SSH with.
 
 ```
 $ yurt shell instance1
@@ -93,6 +89,17 @@ root@instance1:~ #
 
 
 ## Contributing
+
+To get started:
+```
+$ git clone https://github.com/ckmetto/yurt.git
+$ cd yurt
+$ pip install -e .
+$ export YURT_ENV=dev
+$ yurt init
+```
+
+`YURT_ENV=dev` makes yurt set up a separate VM for development. When set, all commands refer to this development VM.
 
 Please create an issue if something does not work for you. Pull requests are welcome. For major changes, please open an issue first to discuss what you would like to change.
 

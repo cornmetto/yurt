@@ -1,19 +1,14 @@
 import logging
-from enum import Enum
-import shutil
 import os
+import shutil
+from enum import Enum
 
-from yurt import util, config
-from . import vbox
-from yurt.exceptions import (
-    ConfigReadException,
-    ConfigWriteException,
-    VMException,
-    VBoxException,
-    YurtException
-)
+from yurt import config
+from yurt import util as yurt_util
+from yurt.exceptions import (ConfigReadException, ConfigWriteException,
+                             VBoxException, VMException, YurtException)
 
-_VM_NAME = config.get_config(config.Key.vm_name)
+from . import util, vbox
 
 
 class State(Enum):
@@ -23,21 +18,24 @@ class State(Enum):
 
 
 def state():
-    if _VM_NAME:
-        try:
-            vm_info = vbox.get_vm_info(_VM_NAME)
-            is_running = vm_info["VMState"].strip('"') == "running"
-            return State.Running if is_running else State.Stopped
-        except (VBoxException, KeyError) as e:
-            logging.debug(e)
-            raise VMException("An error occurred while fetching VM status.")
-    return State.NotInitialized
+    try:
+        vm_name = util.vm_name()
+        vm_info = vbox.get_vm_info(vm_name)
+        is_running = vm_info["VMState"].strip('"') == "running"
+        return State.Running if is_running else State.Stopped
+    except VMException:
+        return State.NotInitialized
+    except (VBoxException, KeyError) as e:
+        logging.debug(e)
+        raise VMException("An error occurred while fetching VM status.")
 
 
 def info():
-    if _VM_NAME:
+    vm_state = state()
+    if vm_state != State.NotInitialized:
+        vm_name = util.vm_name()
         try:
-            vm_info = vbox.get_vm_info(_VM_NAME)
+            vm_info = vbox.get_vm_info(vm_name)
             return {
                 "State": "Running"
                 if vm_info["VMState"].strip('"') == "running"
@@ -48,12 +46,12 @@ def info():
         except (VBoxException, KeyError) as e:
             logging.debug(e)
             raise VMException("An error occurred while fetching VM status.")
-
-    return {"State": "Not Initialized"}
+    else:
+        return {"State": "Not Initialized"}
 
 
 def download_image():
-    if os.path.isfile(config.image) and util.is_sha256(config.image, config.image_sha256):
+    if os.path.isfile(config.image) and yurt_util.is_sha256(config.image, config.image_sha256):
         logging.info("Using cached image...")
     else:
         logging.info(f"Downloading image from {config.image_url}")
@@ -62,17 +60,16 @@ def download_image():
         if not os.path.isdir(image_dir):
             os.mkdir(image_dir)
 
-        util.download_file(
+        yurt_util.download_file(
             config.image_url, config.image, show_progress=True
         )
 
-        if not util.is_sha256(config.image, config.image_sha256):
+        if not yurt_util.is_sha256(config.image, config.image_sha256):
             raise VMException(
                 "Error downloading image. Re-run 'init'.")
 
 
 def init():
-    global _VM_NAME
     from uuid import uuid4
 
     if state() is not State.NotInitialized:
@@ -93,7 +90,6 @@ def init():
                        config.vm_install_dir, config.vm_memory)
 
         config.set_config(config.Key.vm_name, vm_name)
-        _VM_NAME = vm_name
 
         input("""Installing VirtualBox network interface.
 Accept VirtualBox's prompt to allow networking with the host.
@@ -120,9 +116,8 @@ Press enter to continue...""")
 
 
 def start():
-    from datetime import datetime
-
     vm_state = state()
+    vm_name = util.vm_name()
 
     if vm_state == State.NotInitialized:
         raise VMException("VM has not yet been initialized.")
@@ -135,18 +130,13 @@ def start():
         logging.info("Booting up...")
 
         console_file_name = os.path.join(config.vm_install_dir, "console.log")
-        vbox.attach_serial_console(_VM_NAME, console_file_name)
+        vbox.attach_serial_console(vm_name, console_file_name)
 
-        vbox.start_vm(_VM_NAME)
-        util.sleep_for(10, show_spinner=True)
-        logging.info("Waiting for the machine to be ready...")
-        util.sleep_for(10, show_spinner=True)
+        vbox.start_vm(vm_name)
 
-        current_port = config.get_config(config.Key.ssh_port)
-        host_ssh_port = vbox.setup_ssh_port_forwarding(_VM_NAME, current_port)
-        config.set_config(config.Key.ssh_port, host_ssh_port)
-
-        vbox.setup_lxd_port_forwarding(_VM_NAME)
+        yurt_util.sleep_for(5, show_spinner=True)
+        util.setup_port_forwarding()
+        util.wait_for_ssh()
 
     except (VBoxException, ConfigReadException) as e:
         logging.error(e.message)
@@ -159,7 +149,7 @@ def ensure_is_ready(prompt_init=True, prompt_start=True):
 
     if state() == State.NotInitialized:
         if prompt_init:
-            initialize_vm = util.prompt_user(
+            initialize_vm = yurt_util.prompt_user(
                 initialize_vm_prompt, ["yes", "no"]) == "yes"
         else:
             initialize_vm = True
@@ -177,7 +167,7 @@ def ensure_is_ready(prompt_init=True, prompt_start=True):
         from yurt import lxc
 
         if prompt_start:
-            start_vm = util.prompt_user(
+            start_vm = yurt_util.prompt_user(
                 start_vm_prompt, ["yes", "no"]) == "yes"
         else:
             start_vm = True
@@ -185,7 +175,7 @@ def ensure_is_ready(prompt_init=True, prompt_start=True):
         if start_vm:
             try:
                 start()
-                lxc.configure_lxd()
+                lxc.ensure_is_ready()
             except YurtException as e:
                 logging.error(e.message)
         else:
@@ -194,6 +184,7 @@ def ensure_is_ready(prompt_init=True, prompt_start=True):
 
 def stop(force=False):
     vm_state = state()
+    vm_name = util.vm_name()
 
     def confirm_shutdown():
         if state() == State.Running:
@@ -208,8 +199,8 @@ def stop(force=False):
             else:
                 logging.info("Attempting to shut down gracefully...")
 
-            vbox.stop_vm(_VM_NAME, force=force)
-            util.retry(confirm_shutdown, retries=6, wait_time=10)
+            vbox.stop_vm(vm_name, force=force)
+            yurt_util.retry(confirm_shutdown, retries=6, wait_time=10)
         except VBoxException as e:
             logging.error(e.message)
             raise VMException("Shut down failed")
@@ -221,22 +212,48 @@ def delete_instance_files():
 
 
 def destroy():
-    global _VM_NAME
+    vm_name = util.vm_name()
 
     try:
-        vbox.destroy_vm(_VM_NAME)
+        vbox.destroy_vm(vm_name)
         interface_name = config.get_config(config.Key.interface)
 
         vbox.remove_hostonly_interface(interface_name)
 
-        _VM_NAME = None
         config.clear()
     except VBoxException as e:
         logging.error(e.message)
         raise VMException("Failed to destroy VM.")
 
 
+def run_cmd(cmd: str, show_spinner: bool = False, stdin=None):
+    """
+    Run a command in the VM over SSH.
+    """
+    from . import ssh
+
+    if show_spinner:
+        from concurrent.futures import ThreadPoolExecutor
+
+        with ThreadPoolExecutor(max_workers=2) as executor:
+            cmd_future = executor.submit(
+                ssh.run_cmd, cmd, hide_output=show_spinner,
+                stdin=stdin
+            )
+            executor.submit(yurt_util.async_spinner, cmd_future)
+            return cmd_future.result()
+    else:
+        return ssh.run_cmd(cmd, stdin=stdin)
+
+
+def put_file(local_path: str, remote_path: str):
+    from . import ssh
+
+    ssh.put_file(local_path, remote_path)
+
+
 def _setup_network():
+    vm_name = util.vm_name()
     try:
         interface_name = vbox.create_hostonly_interface()
         interface_info = vbox.get_interface_info(interface_name)
@@ -247,7 +264,7 @@ def _setup_network():
         config.set_config(config.Key.interface_netmask, network_mask)
 
         vbox.modify_vm(
-            _VM_NAME,
+            vm_name,
             {
                 "nic1": "nat",
                 "nictype1": "virtio",
@@ -266,21 +283,23 @@ def _setup_network():
 
 
 def _attach_storage_pool_disk():
+    vm_name = util.vm_name()
     try:
         vbox.create_disk(
             config.storage_pool_disk,
             config.storage_pool_disk_size_mb
         )
-        vbox.attach_disk(_VM_NAME, config.storage_pool_disk, 2)
+        vbox.attach_disk(vm_name, config.storage_pool_disk, 2)
     except VBoxException as e:
         logging.error(e.message)
         raise VMException("Storage setup failed")
 
 
 def _attach_config_disk():
+    vm_name = util.vm_name()
     try:
         vbox.clone_disk(config.config_disk_source, config.config_disk)
-        vbox.attach_disk(_VM_NAME, config.config_disk, 1)
+        vbox.attach_disk(vm_name, config.config_disk, 1)
         vbox.remove_disk(config.config_disk_source)
     except VBoxException as e:
         logging.error(e)

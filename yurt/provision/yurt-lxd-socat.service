@@ -1,0 +1,11 @@
+[Unit]
+Description=Forward traffic from port 80 to LXD's unix socket.
+After=snap.lxd.daemon.unix.socket
+
+[Service]
+ExecStart=socat tcp-l:80,fork,reuseaddr unix:/var/snap/lxd/common/lxd/unix.socket
+ExecStop=/usr/bin/kill -s QUIT $MAINPID
+Restart=on-failure
+
+[Install]
+WantedBy=multi-user.target

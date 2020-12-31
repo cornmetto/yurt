@@ -2,13 +2,12 @@ import logging
 import os
 from typing import List
 
-from yurt import config
-from yurt.exceptions import (CommandException, RemoteCommandException,
-                             CommandTimeout, YurtException)
+from yurt.exceptions import CommandException, CommandTimeout, YurtException
 
 
 def download_file(url: str, destination: str, show_progress=False):
     import shutil
+
     import requests
     from click import progressbar
 
@@ -54,13 +53,15 @@ def is_sha256(file_path: str, sha256: str):
     return sha256_hash.hexdigest() == sha256
 
 
-def retry(fn, retries=3, wait_time=5):
+def retry(fn, retries=3, wait_time=5, message=None):
     while True:
         try:
             return fn()
         except Exception as e:
             if retries > 0:
                 retries -= 1
+                if message:
+                    logging.info(message)
                 sleep_for(wait_time, show_spinner=True)
             else:
                 raise e
@@ -92,8 +93,8 @@ def _spinner():
 
 
 def _render_spinner(spinner, clear=False):
-    import sys
     import shutil
+    import sys
 
     columns, _ = shutil.get_terminal_size()
 
@@ -106,7 +107,7 @@ def _render_spinner(spinner, clear=False):
               end="", file=sys.stderr)
 
 
-def _async_spinner(worker_future):
+def async_spinner(worker_future):
     import time
 
     frame_step = 0.075
@@ -167,62 +168,6 @@ def _run(cmd, stdin=None, capture_output=True, timeout=None, env=None):
         logging.error("Operation Aborted")
 
 
-def _get_ssh_connection(port=None):
-    from fabric import Connection
-
-    if not port:
-        port = config.get_config(config.Key.ssh_port)
-
-    return Connection(
-        "localhost",
-        user=config.ssh_user_name, port=port,
-        connect_kwargs={"key_filename": config.ssh_private_key_file}
-
-    )
-
-
-def _run_in_vm(cmd, port=None, hide_output=False, stdin=None):
-    from paramiko import ssh_exception
-    from invoke.exceptions import UnexpectedExit, Failure, ThreadException
-    from io import StringIO
-
-    in_stream = None
-    if stdin:
-        in_stream = StringIO(initial_value=stdin)
-
-    connection = _get_ssh_connection(port)
-    try:
-        result = connection.run(cmd, hide=hide_output, in_stream=in_stream)
-        return (result.stdout, result.stderr)
-    except ssh_exception.NoValidConnectionsError:
-        raise RemoteCommandException("SSH connection failed")
-    except ssh_exception.SSHException as e:
-        logging.debug(e)
-        raise RemoteCommandException("SSH connection failed")
-    except UnexpectedExit as e:
-        logging.debug(e)
-        raise RemoteCommandException("Command exited with nonzero exit code")
-    except Failure as e:
-        logging.debug(e)
-        raise RemoteCommandException("Command was not completed")
-    except ThreadException as e:
-        logging.debug(e)
-        raise RemoteCommandException(
-            "Background I/O threads encountered exceptions.")
-    finally:
-        connection.close()
-
-
-def is_ssh_available(port):
-    logging.debug(f"Checking if SSH is available on port: {port}.")
-
-    try:
-        _run_in_vm("hostname", hide_output=True, port=port)
-        return True
-    except RemoteCommandException:
-        return False
-
-
 def run(cmd: List[str], show_spinner: bool = False, **kwargs):
     """
     Run a command.
@@ -241,37 +186,19 @@ def run(cmd: List[str], show_spinner: bool = False, **kwargs):
 
         with ThreadPoolExecutor(max_workers=2) as executor:
             cmd_future = executor.submit(_run, cmd, **kwargs)
-            executor.submit(_async_spinner, cmd_future)
+            executor.submit(async_spinner, cmd_future)
             return cmd_future.result()
 
     else:
         return _run(cmd, **kwargs)
 
 
-def run_in_vm(cmd: str, show_spinner: bool = False, stdin=None):
-    """
-    Run a command in the VM over SSH.
-    """
-    if show_spinner:
-        from concurrent.futures import ThreadPoolExecutor
-
-        with ThreadPoolExecutor(max_workers=2) as executor:
-            cmd_future = executor.submit(
-                _run_in_vm, cmd, hide_output=show_spinner,
-                stdin=stdin
-            )
-            executor.submit(_async_spinner, cmd_future)
-            return cmd_future.result()
-    else:
-        return _run_in_vm(cmd, stdin=stdin)
-
-
-def random_string():
-    import string
+def random_string(length=10):
     import random
+    import string
 
     alphabet = string.ascii_lowercase + string.digits
-    return ''.join(random.choices(alphabet, k=10))
+    return ''.join(random.choices(alphabet, k=length))
 
 
 def prompt_user(message: str, options: List[str] = None):

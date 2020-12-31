@@ -8,4 +8,6 @@ from .vm import (
     start,
     state,
     stop,
+    run_cmd,
+    put_file,
 )

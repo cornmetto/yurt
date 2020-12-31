@@ -1,5 +1,6 @@
 import logging
 import click
+import os
 from tabulate import tabulate
 
 from yurt.exceptions import YurtException
@@ -24,37 +25,37 @@ def main(debug):
     following commands. For help, use either -h or --help on any
     of the commands. e.g 'yurt launch --help'.
 
-    For simplicity, only images at https://images.linuxcontainers.org are
-    supported at this time.
+    Only images at https://images.linuxcontainers.org are supported at
+    this time.
 
 
     EXAMPLES:
 
     \b
-    $ yurt launch alpine/3.11 c1     -   Launch an alpine/3.11 instances named c1
-    $ yurt stop c1                          -   Stop instnace c1
-    $ yurt delete c1                        -   Delete instnce c1
+    $ yurt launch ubuntu/20.04 c1           -   Launch an ubuntu/20.04 instance named c1
+    $ yurt stop c1                          -   Stop instance c1
+    $ yurt delete c1                        -   Delete instance c1
 
     """
 
     console_handler = logging.StreamHandler()
-    if config.YURT_ENV == "development":
-        logLevel = logging.DEBUG
+
+    log_level = logging.INFO
+    log_formatter = log_formatter = logging.Formatter("%(message)s")
+
+    if debug:
+        log_level = logging.DEBUG
         log_formatter = logging.Formatter(
             "%(levelname)s-%(name)s: %(message)s")
     else:
-        log_formatter = logging.Formatter("%(message)s")
-        if debug:
-            logLevel = logging.DEBUG
-        else:
-            console_handler.addFilter(logging.Filter("root"))
-            logLevel = logging.INFO
+        os.environ["PYLXD_WARNINGS"] = "none"
+        console_handler.addFilter(logging.Filter("root"))
 
     console_handler.setFormatter(log_formatter)
     logger = logging.getLogger()
     logger.handlers.clear()
     logger.addHandler(console_handler)
-    logger.setLevel(logLevel)
+    logger.setLevel(log_level)
 
 
 @main.command()
@@ -85,6 +86,21 @@ def boot():
 
 
 @main.command()
+@click.option("-f", "--force", is_flag=True, help="Force shutdown.")
+def reboot(force):
+    """
+    Reboot the Yurt VM.
+    """
+
+    try:
+        if vm.state() == vm.State.Running:
+            vm.stop(force=force)
+        vm.ensure_is_ready(prompt_init=True, prompt_start=False)
+    except YurtException as e:
+        logging.error(e.message)
+
+
+@main.command()
 @click.option(
     "-f",
     "--force",
@@ -109,7 +125,6 @@ def destroy(force):
             )
         else:
             vm.destroy()
-            lxc.destroy()
     except YurtException as e:
         if force:
             vm.delete_instance_files()
@@ -143,15 +158,14 @@ def shutdown(force):
 
 
 @main.command()
-@click.argument("image", metavar="<alias>")
+@click.argument("image", metavar="<image>")
 @click.argument("name")
 def launch(image, name):
     """
     Create and start an instance.
 
     \b
-    <alias>     -   Alias of image to use as source. e.g. ubuntu/18.04 or
-                    alpine/3.11.
+    <image>     -   Image to use as source. e.g. ubuntu/18.04 or alpine/3.11.
                     Only images in https://images.linuxcontainers.org
                     are supported at this time. Run 'yurt images' to list them.
     NAME        -   Instance name
@@ -173,7 +187,7 @@ def launch(image, name):
     try:
         vm.ensure_is_ready()
 
-        lxc.launch(f"images:{image}", name)
+        lxc.launch("images", image, name)
 
     except YurtException as e:
         logging.error(e.message)
@@ -199,8 +213,7 @@ def start(instances):
 
 @main.command()
 @click.argument("instances", metavar="<instance>...", nargs=-1)
-@click.option("-f", "--force", help="Force the instance to shutdown", is_flag=True)
-def stop(instances, force):
+def stop(instances):
     """
     Stop an instance.
     """
@@ -210,7 +223,7 @@ def stop(instances, force):
     try:
         vm.ensure_is_ready()
 
-        click.echo(lxc.stop(list(instances), force=force))
+        click.echo(lxc.stop(list(instances)))
 
     except YurtException as e:
         logging.error(e.message)
@@ -218,10 +231,7 @@ def stop(instances, force):
 
 @main.command()
 @click.argument("instances", metavar="<instance>...", nargs=-1)
-@click.option(
-    "-f", "--force", help="Force deletion of a running instance", is_flag=True
-)
-def delete(instances, force):
+def delete(instances):
     """
     Delete an instance.
     """
@@ -231,7 +241,7 @@ def delete(instances, force):
     try:
         vm.ensure_is_ready()
 
-        lxc.delete(list(instances), force=force)
+        lxc.delete(list(instances))
 
     except YurtException as e:
         logging.error(e.message)
@@ -292,25 +302,24 @@ def shell(instance):
 
 
 @main.command()
-@click.option("-c", "--cached", is_flag=True, help="List cached images only.")
-def images(cached):
+@click.option("-r", "--remote", is_flag=True, help="List remote images. Only images at https://images.linuxcontainers.org are supported at this time.")
+def images(remote):
     """
-    List available images.
+    List images that can be used to launch containers.
 
-    At this time, only images at https://images.linuxcontainers.org are supported.
     """
 
-    remote = "images"
+    remote_server = "images"
     try:
         vm.ensure_is_ready()
 
-        if cached:
+        if remote:
             images = tabulate(
-                lxc.list_cached_images(), headers="keys", disable_numparse=True
+                lxc.list_remote_images(remote_server), headers="keys", disable_numparse=True
             )
         else:
             images = tabulate(
-                lxc.list_remote_images(remote), headers="keys", disable_numparse=True
+                lxc.list_cached_images(), headers="keys", disable_numparse=True
             )
 
         click.echo(images)

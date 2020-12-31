@@ -12,6 +12,9 @@ setup(
         'paramiko',
         'requests',
         'tabulate',
+        'pylxd',
+        'websockets',
+        'colorama'
     ],
     entry_points='''
         [console_scripts]

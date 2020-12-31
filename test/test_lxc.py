@@ -1,5 +1,6 @@
 import unittest
 import logging
+import os
 
 from yurt import lxc, util
 
@@ -12,7 +13,7 @@ class LXCTest(YurtTest):
         instance_name = f"test-instance-{util.random_string()}"
 
         logging.info(f"Test launch: {instance_name}.")
-        lxc.launch("images:alpine/3.10", instance_name)
+        lxc.launch("images", "alpine/3.10", instance_name)
         instance = util.find(
             lambda i: i["Name"] == instance_name and i["Status"] == "Running",
             lxc.list_(),
@@ -22,7 +23,7 @@ class LXCTest(YurtTest):
 
     def test_stop(self):
         instance_name = f"test-instance-{util.random_string()}"
-        lxc.launch("images:alpine/3.10", instance_name)
+        lxc.launch("images", "alpine/3.10", instance_name)
 
         logging.info(f"Test stop: {instance_name}.")
         lxc.stop([instance_name])
@@ -35,7 +36,7 @@ class LXCTest(YurtTest):
 
     def test_start(self):
         instance_name = f"test-instance-{util.random_string()}"
-        lxc.launch("images:alpine/3.10", instance_name)
+        lxc.launch("images", "alpine/3.10", instance_name)
         lxc.stop([instance_name])
 
         logging.info(f"Test start: {instance_name}.")
@@ -49,7 +50,7 @@ class LXCTest(YurtTest):
 
     def test_delete(self):
         instance_name = f"test-instance-{util.random_string()}"
-        lxc.launch("images:alpine/3.10", instance_name)
+        lxc.launch("images", "alpine/3.10", instance_name)
         lxc.stop([instance_name])
         lxc.delete([instance_name])
 
@@ -62,7 +63,7 @@ class LXCTest(YurtTest):
 
     def test_ping_from_host(self):
         instance_name = f"test-instance-{util.random_string()}"
-        lxc.launch("images:alpine/3.10", instance_name)
+        lxc.launch("images", "alpine/3.10", instance_name)
         instance = util.find(
             lambda i: i["Name"] == instance_name and i["Status"] == "Running",
             lxc.list_(),
@@ -77,11 +78,13 @@ class LXCTest(YurtTest):
     def test_ping_between_instances(self):
         instance1_name = f"test-instance-{util.random_string()}"
         instance2_name = f"test-instance-{util.random_string()}"
-        lxc.launch("images:alpine/3.10", instance1_name)
-        lxc.launch("images:alpine/3.10", instance2_name)
+        lxc.launch("images", "alpine/3.10", instance1_name)
+        lxc.launch("images", "alpine/3.10", instance2_name)
 
-        lxc.exec_(instance1_name, ["ping", "-c1", instance2_name])
+        res = lxc.exec_(instance1_name, ["ping", "-c1", instance2_name])
+        self.assertTrue(res.exit_code == 0)
 
 
 if __name__ == '__main__':
+    os.environ["PYLXD_WARNINGS"] = "none"
     unittest.main()

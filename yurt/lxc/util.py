@@ -1,57 +1,64 @@
-import json
 import logging
 import os
 from typing import List, Dict
+import pylxd
 
 from yurt import config
-from yurt.exceptions import LXCException, RemoteCommandException
-from yurt.util import run, run_in_vm, find
+from yurt import vm
+from yurt.exceptions import LXCException, VMException
+
 
 NETWORK_NAME = "yurt-int"
 PROFILE_NAME = "yurt"
-REMOTES = [
-    {
+REMOTES = {
+    "images": {
         "Name": "images",
         "URL": "https://images.linuxcontainers.org",
     },
-    {
+    "ubuntu": {
         "Name": "ubuntu",
         "URL": "https://cloud-images.ubuntu.com/releases",
     },
-]
+}
 
 
-def get_lxc_executable():
-    if config.system == config.System.windows:
-        lxc_executable = os.path.join(config.bin_dir, "lxc.exe")
-        if os.path.isfile(lxc_executable):
-            return lxc_executable
-        else:
-            raise LXCException(
-                f"{lxc_executable} does not exist.")
-    else:
+def _setup_yurt_socat():
+    name = "yurt-lxd-socat"
+    vm.run_cmd("mkdir -p /tmp/yurt")
+    tmp_unit_file = f"/tmp/yurt/{name}.service"
+    installed_unit_file = f"/etc/systemd/system/{name}.service"
+    vm.run_cmd("sudo apt install socat -y")
+    vm.put_file(os.path.join(config.provision_dir,
+                             f"{name}.service"), tmp_unit_file)
+    vm.run_cmd(f"sudo cp {tmp_unit_file} {installed_unit_file}")
+    vm.run_cmd("sudo systemctl daemon-reload")
+    vm.run_cmd(f"sudo systemctl enable {name}")
+    vm.run_cmd(f"sudo systemctl start {name}")
+
+
+def get_pylxd_client():
+    lxd_port = config.get_config(config.Key.lxd_port)
+    try:
+        return pylxd.Client(endpoint=f"http://127.0.0.1:{lxd_port}")
+    except pylxd.exceptions.ClientConnectionFailed as e:
+        logging.debug(e)
         raise LXCException(
-            f"LXC executable not found for platform: {config.system}")
+            "Error connecting to LXD. Try rebooting the VM: 'yurt reboot'")
+
+
+def get_instance(name: str):
+    client = get_pylxd_client()
+    try:
+        return client.instances.get(name)  # pylint: disable=no-member
+    except pylxd.exceptions.NotFound:
+        raise LXCException(f"Instance {name} not found.")
+    except pylxd.exceptions.LXDAPIException:
+        raise LXCException(
+            f"Could not fetch instance {name}. API Error.")
 
 
 def is_initialized():
     return config.get_config(config.Key.is_lxd_initialized)
-
-
-def is_remote_configured():
-    result = run_lxc(["remote", "list", "--format", "json"])
-    remotes = json.loads(result)
-    return bool(remotes.get("yurt"))
-
-
-def is_network_configured():
-    networks = json.loads(run_lxc(["network", "list", "--format", "json"]))
-    return NETWORK_NAME in list(map(lambda n: n["name"], networks))
-
-
-def is_profile_configured():
-    profiles = json.loads(run_lxc(["profile", "list", "--format", "json"]))
-    return PROFILE_NAME in list(map(lambda p: p["name"], profiles))
 
 
 def get_ip_config():
@@ -78,93 +85,83 @@ def get_ip_config():
 
 
 def initialize_lxd():
-    lxd_init = """config:
-  core.https_address: '[::]:8443'
-  core.trust_password: yurtsecret
-networks: []
-storage_pools:
-- config:
-    source: /dev/sdc
-  description: ""
-  name: yurtpool
-  driver: zfs
-profiles:
-- config: {}
-  description: ""
-  devices:
-    root:
-      path: /
-      pool: yurtpool
-      type: disk
-  name: default
-cluster: null
-    """
+    if is_initialized():
+        return
 
     try:
-        logging.info("Installing LXD. This might take a few minutes...")
-        run_in_vm("sudo snap install lxd", show_spinner=True)
-        logging.info("LXD installed. Configuring...")
+        with open(os.path.join(config.provision_dir, "lxd-init.yaml"), "r") as f:
+            init = f.read()
+    except OSError as e:
+        raise LXCException(f"Error reading lxd-init.yaml {e}")
 
-        run_in_vm("sudo lxd.migrate -yes", show_spinner=True)
-        run_in_vm(
+    try:
+        logging.info("Updating package information...")
+        vm.run_cmd("sudo apt update", show_spinner=True)
+        vm.run_cmd("sudo usermod yurt -a -G lxd")
+
+        logging.info("Initializing LXD...")
+        vm.run_cmd(
             "sudo lxd init --preseed",
-            stdin=lxd_init,
+            stdin=init,
             show_spinner=True
         )
+        _setup_yurt_socat()
+
         logging.info("Done.")
         config.set_config(config.Key.is_lxd_initialized, True)
-    except RemoteCommandException as e:
+    except VMException as e:
         logging.error(e)
-        logging.info("Restart the VM to try again: 'yurt shutdown; yurt boot'")
+        logging.error("Restart the VM to try again: 'yurt reboot'")
         raise LXCException("Failed to initialize LXD.")
 
 
-def configure_network():
-    if is_network_configured():
-        print("network is defined")
+def check_network_config():
+    client = get_pylxd_client()
+    if client.networks.exists(NETWORK_NAME):  # pylint: disable=no-member
         return
 
+    logging.info("Configuring network...")
     ip_config = get_ip_config()
     bridge_address = ip_config["bridgeAddress"]
     dhcp_range_low = ip_config["dhcpRangeLow"]
     dhcp_range_high = ip_config["dhcpRangeHigh"]
 
-    run_lxc(["network", "create", NETWORK_NAME,
-             "bridge.external_interfaces=enp0s8",
-             "ipv6.address=none",
-             "ipv4.nat=true",
-             "ipv4.dhcp=true",
-             "ipv4.dhcp.expiry=24h",
-             f"ipv4.address={bridge_address}",
-             f"ipv4.dhcp.ranges={dhcp_range_low}-{dhcp_range_high}",
-             f"dns.domain={config.app_name}"
-             ]
-            )
+    client.networks.create(  # pylint: disable=no-member
+        NETWORK_NAME, description="Yurt Network", type="bridge",
+        config={
+            "bridge.external_interfaces": "enp0s8",
+            "ipv6.address": "none",
+            "ipv4.nat": "true",
+            "ipv4.dhcp": "true",
+            "ipv4.dhcp.expiry": "24h",
+            "ipv4.address": bridge_address,
+            "ipv4.dhcp.ranges": f"{dhcp_range_low}-{dhcp_range_high}",
+            "dns.domain": config.app_name
+        })
 
 
-def configure_profile():
-    profile_config = f"""name: {PROFILE_NAME}
-config: {{}}
-description: Yurt Default Profile
-devices:
-    eth0:
-        name: eth0
-        nictype: bridged
-        parent: {NETWORK_NAME}
-        type: nic
-    root:
-        path: /
-        pool: yurtpool
-        type: disk"""
+def check_profile_config():
+    client = get_pylxd_client()
+    if client.profiles.exists(PROFILE_NAME):  # pylint: disable=no-member
+        return
 
-    run_lxc(["profile", "create", PROFILE_NAME])
-    run_lxc(["profile", "edit", PROFILE_NAME], stdin=profile_config)
-
-
-def configure_remote():
-    run_lxc(["remote", "add", "yurt", "localhost",
-             "--password", "yurtsecret", "--accept-certificate"])
-    run_lxc(["remote", "switch", "yurt"])
+    logging.info("Configuring profile...")
+    client.profiles.create(  # pylint: disable=no-member
+        PROFILE_NAME,
+        devices={
+            "eth0": {
+                "name": "eth0",
+                "nictype": "bridged",
+                "parent": NETWORK_NAME,
+                "type": "nic"
+            },
+            "root": {
+                "type": "disk",
+                "pool": "yurtpool",
+                "path": "/"
+            }
+        }
+    )
 
 
 def shortest_alias(aliases: List[Dict[str, str]], remote: str):
@@ -207,37 +204,66 @@ def get_remote_image_info(remote: str, image: Dict):
         logging.debug(f"Unexpected image schema: {image}")
 
 
-def get_cached_image_info(image: Dict):
+def exec_interactive(instance_name: str, cmd: List[str]):
+    from . import term
+
+    instance = get_instance(instance_name)
+    response = instance.raw_interactive_execute(cmd)
+    lxd_port = config.get_config(config.Key.lxd_port)
     try:
-        alias = image["update_source"]["alias"]
-        server = image["update_source"]["server"]
-        remote = find(lambda r: r["URL"] == server, REMOTES, None)
 
-        if remote:
-            source = f"{remote['Name']}:{alias}"
-        else:
-            raise LXCException("Unexpected source server: {}")
-
-        return {
-            "Alias": source,
-            "Description": image["properties"]["description"]
-        }
-
+        ws_url = f"ws://127.0.0.1:{lxd_port}{response['ws']}"
+        term.run(ws_url)
     except KeyError as e:
-        logging.debug(e)
-        logging.debug(f"Unexpected image schema: {image}")
+        raise LXCException(f"Missing ws URL {e}")
 
 
-def run_lxc(args: List[str], **kwargs):
+def unpack_download_operation_metadata(metadata):
+    if metadata:
+        if "download_progress" in metadata:
+            return f"Download progress: {metadata['download_progress']}"
+        if "create_instance_from_image_unpack_progress" in metadata:
+            return f"Unpack progress: {metadata['create_instance_from_image_unpack_progress']}"
+    else:
+        return ""
+
+
+def follow_operation(operation_uri: str, unpack_metadata=None):
     """
-    See yurt.util.run for **kwargs documentation.
+    Params:
+        operation_uri:      URI of the operation to follow.
+        unpack_metadata:    Function to unpack the operation's metadata. Return a line of text to summarize
+                            the current progress of the operation.
+                            If not given, progress will not be shown.
     """
+    import time
+    from yurt.util import retry
 
-    lxc = get_lxc_executable()
-    cmd = [lxc] + args
+    operations = get_pylxd_client().operations
 
-    lxc_env = {
-        "HOME": config.config_dir
-    }
+    # Allow time for operation to be created.
+    try:
+        retry(
+            lambda: operations.get(operation_uri),  # pylint: disable=no-member
+            retries=10,
+            wait_time=0.5
+        )
+        operation = operations.get(operation_uri)  # pylint: disable=no-member
+    except pylxd.exceptions.NotFound:
+        raise LXCException(
+            f"Timed out while waiting for operation to be created.")
 
-    return run(cmd, env=lxc_env, **kwargs)
+    logging.info(operation.description)
+    while True:
+        try:
+            operation = operations.get(  # pylint: disable=no-member
+                operation_uri
+            )
+            if unpack_metadata:
+                print(f"\r{unpack_metadata(operation.metadata)}", end="")
+            time.sleep(0.5)
+        except pylxd.exceptions.NotFound:
+            print("\nDone")
+            break
+        except KeyboardInterrupt:
+            break

@@ -15,6 +15,9 @@ paramiko = "*"
 tabulate = "*"
 fabric = "*"
 requests = "*"
+pylxd = "*"
+websockets = "*"
+colorama = "*"
 
 [requires]
 python_version = "3.8"
