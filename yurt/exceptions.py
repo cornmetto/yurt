@@ -11,10 +11,6 @@ class CommandTimeout(YurtException):
     pass
 
 
-class RemoteCommandException(YurtException):
-    pass
-
-
 class LXCException(YurtException):
     pass
 

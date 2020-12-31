@@ -95,11 +95,11 @@ To get started:
 $ git clone https://github.com/ckmetto/yurt.git
 $ cd yurt
 $ pip install -e .
-$ export YURT_ENV=development
+$ export YURT_ENV=dev
 $ yurt init
 ```
 
-`YURT_ENV=development` makes yurt set up a separate VM for development. Remember to set the variable during development.
+`YURT_ENV=dev` makes yurt set up a separate VM for development. When set, all commands refer to this development VM.
 
 Please create an issue if something does not work for you. Pull requests are welcome. For major changes, please open an issue first to discuss what you would like to change.
 

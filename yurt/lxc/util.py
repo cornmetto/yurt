@@ -4,8 +4,8 @@ from typing import List, Dict
 import pylxd
 
 from yurt import config
-from yurt.exceptions import LXCException, RemoteCommandException
-from yurt.util import run_in_vm, put_file
+from yurt import vm
+from yurt.exceptions import LXCException, VMException
 
 
 NETWORK_NAME = "yurt-int"
@@ -22,11 +22,24 @@ REMOTES = {
 }
 
 
-def get_pylxd_client(port: int = None):
-    if not port:
-        port = config.lxd_port
+def _setup_yurt_socat():
+    name = "yurt-lxd-socat"
+    vm.run_cmd("mkdir -p /tmp/yurt")
+    tmp_unit_file = f"/tmp/yurt/{name}.service"
+    installed_unit_file = f"/etc/systemd/system/{name}.service"
+    vm.run_cmd("sudo apt install socat -y")
+    vm.put_file(os.path.join(config.provision_dir,
+                             f"{name}.service"), tmp_unit_file)
+    vm.run_cmd(f"sudo cp {tmp_unit_file} {installed_unit_file}")
+    vm.run_cmd("sudo systemctl daemon-reload")
+    vm.run_cmd(f"sudo systemctl enable {name}")
+    vm.run_cmd(f"sudo systemctl start {name}")
+
+
+def get_pylxd_client():
+    lxd_port = config.get_config(config.Key.lxd_port)
     try:
-        return pylxd.Client(endpoint=f"http://127.0.0.1:{port}")
+        return pylxd.Client(endpoint=f"http://127.0.0.1:{lxd_port}")
     except pylxd.exceptions.ClientConnectionFailed as e:
         logging.debug(e)
         raise LXCException(
@@ -71,20 +84,6 @@ def get_ip_config():
     }
 
 
-def _setup_yurt_socat():
-    name = "yurt-lxd-socat"
-    run_in_vm("mkdir -p /tmp/yurt")
-    tmp_unit_file = f"/tmp/yurt/{name}.service"
-    installed_unit_file = f"/etc/systemd/system/{name}.service"
-    run_in_vm("sudo apt install socat -y")
-    put_file(os.path.join(config.provision_dir,
-                          f"{name}.service"), tmp_unit_file)
-    run_in_vm(f"sudo cp {tmp_unit_file} {installed_unit_file}")
-    run_in_vm("sudo systemctl daemon-reload")
-    run_in_vm(f"sudo systemctl enable {name}")
-    run_in_vm(f"sudo systemctl start {name}")
-
-
 def initialize_lxd():
     if is_initialized():
         return
@@ -97,11 +96,11 @@ def initialize_lxd():
 
     try:
         logging.info("Updating package information...")
-        run_in_vm("sudo apt update", show_spinner=True)
-        run_in_vm("sudo usermod yurt -a -G lxd")
+        vm.run_cmd("sudo apt update", show_spinner=True)
+        vm.run_cmd("sudo usermod yurt -a -G lxd")
 
         logging.info("Initializing LXD...")
-        run_in_vm(
+        vm.run_cmd(
             "sudo lxd init --preseed",
             stdin=init,
             show_spinner=True
@@ -110,13 +109,13 @@ def initialize_lxd():
 
         logging.info("Done.")
         config.set_config(config.Key.is_lxd_initialized, True)
-    except RemoteCommandException as e:
+    except VMException as e:
         logging.error(e)
-        logging.info("Restart the VM to try again: 'yurt reboot'")
+        logging.error("Restart the VM to try again: 'yurt reboot'")
         raise LXCException("Failed to initialize LXD.")
 
 
-def configure_network():
+def check_network_config():
     client = get_pylxd_client()
     if client.networks.exists(NETWORK_NAME):  # pylint: disable=no-member
         return
@@ -141,7 +140,7 @@ def configure_network():
         })
 
 
-def configure_profile():
+def check_profile_config():
     client = get_pylxd_client()
     if client.profiles.exists(PROFILE_NAME):  # pylint: disable=no-member
         return
@@ -206,13 +205,14 @@ def get_remote_image_info(remote: str, image: Dict):
 
 
 def exec_interactive(instance_name: str, cmd: List[str]):
-    from yurt.lxc import term
+    from . import term
 
     instance = get_instance(instance_name)
     response = instance.raw_interactive_execute(cmd)
+    lxd_port = config.get_config(config.Key.lxd_port)
     try:
 
-        ws_url = f"ws://127.0.0.1:{config.lxd_port}{response['ws']}"
+        ws_url = f"ws://127.0.0.1:{lxd_port}{response['ws']}"
         term.run(ws_url)
     except KeyError as e:
         raise LXCException(f"Missing ws URL {e}")

@@ -25,16 +25,16 @@ def main(debug):
     following commands. For help, use either -h or --help on any
     of the commands. e.g 'yurt launch --help'.
 
-    For simplicity, only images at https://images.linuxcontainers.org are
-    supported at this time.
+    Only images at https://images.linuxcontainers.org are supported at
+    this time.
 
 
     EXAMPLES:
 
     \b
-    $ yurt launch alpine/3.11 c1     -   Launch an alpine/3.11 instances named c1
-    $ yurt stop c1                          -   Stop instnace c1
-    $ yurt delete c1                        -   Delete instnce c1
+    $ yurt launch ubuntu/20.04 c1           -   Launch an ubuntu/20.04 instance named c1
+    $ yurt stop c1                          -   Stop instance c1
+    $ yurt delete c1                        -   Delete instance c1
 
     """
 

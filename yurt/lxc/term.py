@@ -1,11 +1,11 @@
 import asyncio
 import logging
 from concurrent.futures import ThreadPoolExecutor
-from typing import List
 
 import colorama
 import websockets
 from websockets import WebSocketClientProtocol
+
 from yurt import config
 from yurt.exceptions import TermException
 
@@ -26,11 +26,11 @@ async def _user_input(process_ws: WebSocketClientProtocol):
             try:
                 await process_ws.send(input_bytes)
             except websockets.exceptions.ConnectionClosedOK:
-                logging.debug("Websocket connection closed.")
+                logging.debug("_user_input: Websocket connection closed.")
                 return
             except websockets.exceptions.ConnectionClosedError as e:
                 logging.debug(
-                    f"Websocket connection closed with an erorr: {e}")
+                    f"_user_input: Websocket connection closed with an erorr: {e}")
                 return
 
 
@@ -40,12 +40,16 @@ async def _remote_tty_input(process_ws: WebSocketClientProtocol):
             input_bytes = await process_ws.recv()
             if len(input_bytes) > 0:
                 _render(input_bytes)
+            else:
+                logging.debug(
+                    "_remote_tty_input: Received zero bytes. End of communication.")
+                return
         except websockets.exceptions.ConnectionClosedOK:
-            logging.debug("Websocket connection closed.")
+            logging.debug("_remote_tty_input: Websocket connection closed.")
             return
         except websockets.exceptions.ConnectionClosedError as e:
             logging.debug(
-                f"Websocket connection closed with an erorr: {e}")
+                f"_remote_tty_input: Websocket connection closed with an erorr: {e}")
             return
 
 
@@ -66,17 +70,13 @@ async def _run(ws_url: str):
 
 
 def run(ws_url: str):
-    logger = logging.getLogger()
-    original_log_level = logger.getEffectiveLevel()
-    logger.setLevel(logging.ERROR)
+    logging.getLogger("websockets").setLevel(logging.ERROR)
     colorama.init()
 
     try:
         asyncio.get_event_loop().run_until_complete(_run(ws_url))
     except websockets.exceptions.ConnectionClosedError as e:
-        logger.setLevel(original_log_level)
         logging.debug(e)
         return
 
     colorama.deinit()
-    logger.setLevel(original_log_level)

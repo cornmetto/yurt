@@ -1,6 +1,6 @@
 from .lxc import (
     exec_,
-    configure_lxd,
+    ensure_is_ready,
     launch,
     list_,
     delete,

@@ -17,6 +17,7 @@ class Key(Enum):
     interface_netmask = 4
     ssh_port = 5
     is_lxd_initialized = 6
+    lxd_port = 7
 
 
 class System(Enum):
@@ -38,15 +39,8 @@ else:
     sys.exit(1)
 
 
-YURT_ENV = os.environ.get("YURT_ENV")
-
-
-if YURT_ENV == "development":
-    _app_dir_name = f"{app_name}-dev"
-elif YURT_ENV == "test":
-    _app_dir_name = f"{app_name}-test"
-else:
-    _app_dir_name = f"{app_name}"
+YURT_ENV = os.environ.get("YURT_ENV", "")
+_app_dir_name = f"{app_name}-{YURT_ENV}"
 
 
 try:
@@ -65,8 +59,8 @@ image_url = "https://cloud-images.ubuntu.com/releases/focal/release-20201210/ubu
 image_sha256 = "8a79978328c7eb25fb86d84967415cea329d5c540b01bea55262f6df61b7fc64"
 vm_memory = 2048  # MB
 storage_pool_disk_size_mb = 64000  # MB
-ssh_user_name = "yurt"
-lxd_port = 4242
+user_name = "yurt"
+port_range = (55000, 59999)
 
 
 # Instance Paths ############################################################

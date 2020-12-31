@@ -2,19 +2,27 @@ import logging
 from typing import List
 from pylxd.exceptions import LXDAPIException
 
-from yurt.exceptions import LXCException, CommandException
-from yurt.util import retry, find
-from .util import *  # pylint: disable=unused-wildcard-import
+from yurt.exceptions import LXCException, VMException
+from yurt import vm
+from yurt import util as yurt_util
+from . import util
 
 
-def configure_lxd():
-    initialize_lxd()
+def ensure_is_ready():
+    yurt_util.retry(
+        util.initialize_lxd,
+        retries=3, wait_time=3,
+        message="LXD init failed. Retrying..."
+    )
 
-    def check_config():
-        configure_network()
-        configure_profile()
-
-    retry(check_config, retries=10, wait_time=6)
+    # wait for LXD to be available
+    yurt_util.retry(
+        util.get_pylxd_client,
+        retries=3, wait_time=3,
+        message="LXD is not yet available. Retrying..."
+    )
+    util.check_network_config()
+    util.check_profile_config()
 
 
 def list_():
@@ -25,8 +33,9 @@ def list_():
         if state.network:
             try:
                 addresses = state.network["eth0"]["addresses"]
-                ipv4_info = find(
-                    lambda a: a["family"] == "inet", addresses, {})
+                ipv4_info = yurt_util.find(
+                    lambda a: a["family"] == "inet", addresses, {}
+                )
                 ipv4_address = ipv4_info.get("address", "")
             except KeyError as e:
                 logging.debug(f"Missing instance data: {e}")
@@ -42,7 +51,7 @@ def list_():
             logging.error(e)
             return ""
 
-    client = get_pylxd_client()
+    client = util.get_pylxd_client()
     instances = []
     for instance in client.instances.all():  # pylint: disable=no-member
         instances.append({
@@ -57,25 +66,25 @@ def list_():
 
 def start(names: List[str]):
     for name in names:
-        instance = get_instance(name)
+        instance = util.get_instance(name)
         try:
-            instance.start()
+            instance.start(wait=True)
         except LXDAPIException as e:
             raise LXCException(f"Error starting instance: {e}")
 
 
 def stop(names: List[str]):
     for name in names:
-        instance = get_instance(name)
+        instance = util.get_instance(name)
         try:
-            instance.stop()
+            instance.stop(wait=True)
         except LXDAPIException as e:
             raise LXCException(f"Error stopping instance: {e}")
 
 
 def delete(names: List[str]):
     for name in names:
-        instance = get_instance(name)
+        instance = util.get_instance(name)
         try:
             instance.delete(wait=True)
         except LXDAPIException as e:
@@ -90,9 +99,9 @@ def launch(remote: str, image: str, name: str):
     #   - Not start with a digit or a dash
     #   - Not end with a dash
 
-    client = get_pylxd_client()
+    client = util.get_pylxd_client()
     try:
-        server_url = REMOTES[remote]["URL"]
+        server_url = util.REMOTES[remote]["URL"]
     except KeyError:
         raise LXCException(f"Unsupported remote {remote}")
 
@@ -101,7 +110,7 @@ def launch(remote: str, image: str, name: str):
             f"Launching container {name}. This might take a few minutes...")
         response = client.api.instances.post(json={
             "name": name,
-            "profiles": [PROFILE_NAME],
+            "profiles": [util.PROFILE_NAME],
             "source": {
                 "type": "image",
                 "alias": image,
@@ -111,13 +120,13 @@ def launch(remote: str, image: str, name: str):
             }
         })
 
-        follow_operation(
+        util.follow_operation(
             response.json()["operation"],
-            unpack_metadata=unpack_download_operation_metadata
+            unpack_metadata=util.unpack_download_operation_metadata
         )
 
         logging.info(f"Starting container")
-        instance = get_instance(name)
+        instance = util.get_instance(name)
         instance.start()
     except LXDAPIException as e:
         logging.error(e)
@@ -125,12 +134,12 @@ def launch(remote: str, image: str, name: str):
 
 
 def exec_(instance_name: str, cmd: List[str]):
-    instance = get_instance(instance_name)
+    instance = util.get_instance(instance_name)
     return instance.execute(cmd)
 
 
-def shell(instance: str):
-    exec_interactive(instance, ["su", "root"])
+def shell(instance_name: str):
+    util.exec_interactive(instance_name, ["su", "root"])
 
 
 def list_remote_images(remote: str):
@@ -140,16 +149,16 @@ def list_remote_images(remote: str):
     try:
         # We'd have to implement simplestreams ourselves as this call is handled
         # entirely by the client. Let's cheat.
-        output, error = run_in_vm(
+        output, error = vm.run_cmd(
             f"lxc image list {remote}: --format json", show_spinner=True)
         if error:
             logging.error(error)
 
-        images = filter_remote_images(json.loads(output))
+        images = util.filter_remote_images(json.loads(output))
 
         images_info = filter(
             None,
-            map(partial(get_remote_image_info, remote), images)
+            map(partial(util.get_remote_image_info, remote), images)
         )
 
         if remote == "ubuntu":
@@ -157,8 +166,10 @@ def list_remote_images(remote: str):
         else:
             return sorted(images_info, key=lambda i: i["Alias"])
 
-    except CommandException as e:
-        raise LXCException(f"Could not fetch images: {e.message}")
+    except VMException as e:
+        message = f"Could not fetch remote images: {e.message}"
+        logging.error("Please confirm that you're connected to the internet.")
+        raise LXCException(message)
 
 
 def list_cached_images():
@@ -171,7 +182,7 @@ def list_cached_images():
         except KeyError as e:
             logging.debug(f"Error {e}: Unexpected image schema: {image}")
 
-    client = get_pylxd_client()
+    client = util.get_pylxd_client()
     images = client.images.all()  # pylint: disable=no-member
     images_info = filter(None, map(get_cached_image_info, images))
     return list(images_info)

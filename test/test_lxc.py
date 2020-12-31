@@ -1,5 +1,6 @@
 import unittest
 import logging
+import os
 
 from yurt import lxc, util
 
@@ -85,4 +86,5 @@ class LXCTest(YurtTest):
 
 
 if __name__ == '__main__':
+    os.environ["PYLXD_WARNINGS"] = "none"
     unittest.main()
