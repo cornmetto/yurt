@@ -100,6 +100,7 @@ $ yurt init
 ```
 
 `YURT_ENV=dev` makes yurt set up a separate VM for development. When set, all commands refer to this development VM.
+Similarly, you can set `YURT_ENV=test` to run tests in yet another separate VM with `python -m unittest`.
 
 Please create an issue if something does not work for you. Pull requests are welcome. For major changes, please open an issue first to discuss what you would like to change.
 

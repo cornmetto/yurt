@@ -3,10 +3,16 @@ import logging
 import os
 import unittest
 
-from yurt import vm, lxc, util, config
+from yurt import util as yurt_util
+from yurt import vm, lxc, config
 from yurt.exceptions import YurtException
 
-logging.basicConfig(format='%(levelname)s: %(message)s', level="INFO")
+
+os.environ["PYLXD_WARNINGS"] = "none"
+logging.basicConfig(format='%(levelname)s-%(name)s: %(message)s', level="INFO")
+logging.captureWarnings(True)
+logging.getLogger("py.warnings").setLevel(logging.ERROR)
+logging.getLogger("ws4py").setLevel(logging.ERROR)
 
 
 class YurtTest(unittest.TestCase):
@@ -14,7 +20,8 @@ class YurtTest(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         cls.discard_vm = os.environ.get(
-            "YURT_TEST_DISCARD_VM_POLICY") == "discard"
+            "YURT_TEST_DISCARD_VM_POLICY"
+        ) == "discard"
 
         if cls.discard_vm:
             if vm.state() == vm.State.Running:
@@ -29,12 +36,12 @@ class YurtTest(unittest.TestCase):
 
         if vm.state() == vm.State.Stopped:
             vm.start()
-            lxc.configure_lxd()
+            lxc.ensure_is_ready()
 
         def check_if_running():
             if vm.state() != vm.State.Running:
                 raise YurtException("VM Not running")
-        util.retry(check_if_running)
+        yurt_util.retry(check_if_running)
 
     @classmethod
     def tearDownClass(cls):
@@ -51,7 +58,17 @@ def ping(ip_address: str):
     cmd = ["ping", packets_number_option, "1", ip_address]
 
     try:
-        util.run(cmd)
+        yurt_util.run(cmd)
         return True
-    except YurtException:
+    except YurtException as e:
+        logging.error(e)
         return False
+
+
+def generate_instance_name():
+    return f"test-{yurt_util.random_string()}"
+
+
+def mark(title: str):
+    title_str = f"=> {title} "
+    print(f"\n{title_str}{'-' * (70 - len(title_str))}")

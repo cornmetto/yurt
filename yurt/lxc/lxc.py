@@ -127,7 +127,7 @@ def launch(remote: str, image: str, name: str):
 
         logging.info(f"Starting container")
         instance = util.get_instance(name)
-        instance.start()
+        instance.start(wait=True)
     except LXDAPIException as e:
         logging.error(e)
         raise LXCException(f"Failed to launch instance {name}")
