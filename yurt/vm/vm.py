@@ -127,7 +127,7 @@ def start():
         return
 
     try:
-        logging.info("Booting up...")
+        logging.info("Starting up...")
 
         console_file_name = os.path.join(config.vm_install_dir, "console.log")
         vbox.attach_serial_console(vm_name, console_file_name)
@@ -145,12 +145,12 @@ def start():
 
 def ensure_is_ready(prompt_init=True, prompt_start=True):
     initialize_vm_prompt = "Yurt has not been initialized. Initialize now?"
-    start_vm_prompt = "Yurt is not running. Boot up now?"
+    start_vm_prompt = "Yurt is not running. Start up now?"
 
     if state() == State.NotInitialized:
         if prompt_init:
             initialize_vm = yurt_util.prompt_user(
-                initialize_vm_prompt, ["yes", "no"]) == "yes"
+                initialize_vm_prompt, ["y", "n"]) == "y"
         else:
             initialize_vm = True
 
@@ -168,7 +168,7 @@ def ensure_is_ready(prompt_init=True, prompt_start=True):
 
         if prompt_start:
             start_vm = yurt_util.prompt_user(
-                start_vm_prompt, ["yes", "no"]) == "yes"
+                start_vm_prompt, ["y", "n"]) == "y"
         else:
             start_vm = True
 
@@ -244,6 +244,15 @@ def run_cmd(cmd: str, show_spinner: bool = False, stdin=None):
             return cmd_future.result()
     else:
         return ssh.run_cmd(cmd, stdin=stdin)
+
+
+def ssh():
+    import subprocess
+
+    ssh_port = config.get_config(config.Key.ssh_port)
+    subprocess.run(
+        f"ssh -i {config.ssh_private_key_file} yurt@127.0.0.1 -p {ssh_port}",
+    )
 
 
 def put_file(local_path: str, remote_path: str):

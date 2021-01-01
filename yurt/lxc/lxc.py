@@ -107,7 +107,7 @@ def launch(remote: str, image: str, name: str):
 
     try:
         logging.info(
-            f"Launching container {name}. This might take a few minutes...")
+            f"Launching container '{name}'. This might take a few minutes...")
         response = client.api.instances.post(json={
             "name": name,
             "profiles": [util.PROFILE_NAME],
