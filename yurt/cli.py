@@ -18,23 +18,33 @@ def main(debug):
     Linux Containers for Development.
 
     Yurt sets up a virtual machine with a pre-configured LXD server.
-    Services in containers can be accessed directly from the host using
-    the listed IP addresses. See 'yurt list'.
-
-    A selection of LXD's commonly used features are exposed through the
-    following commands. For help, use either -h or --help on any
-    of the commands. e.g 'yurt launch --help'.
+    Containers can be accessed directly from the host using the listed
+    IP addresses. See 'yurt list'.
 
     Only images at https://images.linuxcontainers.org are supported at
     this time.
+
+    For help on a specific command, run 'yurt <cmd> -h'.
+
+
+    NOTE:
+
+    A handful of LXD's basic features are exposed in this CLI.
+    Should you need more functionality, 'yurt vm ssh' will launch an
+    interactive shell in     the Yurt VM. However, you will be on your
+    own as changes you make to the system may affect how Yurt works.
+    A reasonable use for this would be if you need to load extra kernel modules
+    for use in containers.
+
+
 
 
     EXAMPLES:
 
     \b
-    $ yurt launch ubuntu/20.04 c1           -   Launch an ubuntu/20.04 instance named c1
-    $ yurt stop c1                          -   Stop instance c1
-    $ yurt delete c1                        -   Delete instance c1
+    $ yurt launch ubuntu/20.04 c1           -   Launch an ubuntu/20.04 container named c1
+    $ yurt stop c1                          -   Stop container c1
+    $ yurt delete c1                        -   Delete container c1
 
     """
 
@@ -58,10 +68,17 @@ def main(debug):
     logger.setLevel(log_level)
 
 
-@main.command()
+@main.group(name="vm")
+def vm_():
+    """
+    Manage the Yurt VM.
+    """
+
+
+@vm_.command()
 def init():
     """
-    Initialize the Yurt VM.
+    Initialize the VM.
     """
 
     try:
@@ -70,10 +87,10 @@ def init():
         logging.error(e.message)
 
 
-@main.command()
-def boot():
+@vm_.command(name="start")
+def start_vm():
     """
-    Start up the Yurt VM.
+    Start up the VM.
     """
 
     try:
@@ -85,11 +102,23 @@ def boot():
         logging.error(e.message)
 
 
-@main.command()
-@click.option("-f", "--force", is_flag=True, help="Force shutdown.")
-def reboot(force):
+@vm_.command()
+def ssh():
     """
-    Reboot the Yurt VM.
+    SSH into the VM.
+    """
+    try:
+        vm.ensure_is_ready()
+        vm.ssh()
+    except YurtException as e:
+        logging.error(e.message)
+
+
+@vm_.command()
+@click.option("-f", "--force", is_flag=True, help="Force shutdown.")
+def restart(force):
+    """
+    Restart the VM.
     """
 
     try:
@@ -100,7 +129,7 @@ def reboot(force):
         logging.error(e.message)
 
 
-@main.command()
+@vm_.command()
 @click.option(
     "-f",
     "--force",
@@ -109,7 +138,7 @@ def reboot(force):
 )
 def destroy(force):
     """
-    Destroy the Yurt VM. Deletes all resources.
+    Destroy the VM. Deletes all resources. Start over with 'yurt vm init'.
     """
 
     try:
@@ -138,11 +167,11 @@ def destroy(force):
             vm.delete_instance_files()
 
 
-@main.command()
+@vm_.command()
 @click.option("-f", "--force", is_flag=True, help="Force shutdown.")
-def shutdown(force):
+def halt(force):
     """
-    Shutdown the yurt VM.
+    Shut down the VM.
     """
 
     try:
@@ -154,100 +183,7 @@ def shutdown(force):
                 "Try forcing shutdown with 'yurt shutdown --force'.")
 
 
-# Instances #############################################################
-
-
-@main.command()
-@click.argument("image", metavar="<image>")
-@click.argument("name")
-def launch(image, name):
-    """
-    Create and start an instance.
-
-    \b
-    <image>     -   Image to use as source. e.g. ubuntu/18.04 or alpine/3.11.
-                    Only images in https://images.linuxcontainers.org
-                    are supported at this time. Run 'yurt images' to list them.
-    NAME        -   Instance name
-
-    \b
-    Instance names must:
-    * be between 1 and 63 characters long
-    * be made up exclusively of letters, numbers and dashes from the ASCII table
-    * not start with a digit or a dash
-    * not end with a dash
-
-    EXAMPLES:
-
-    \b
-    $ yurt launch ubuntu/18.04 c1       -   Create and start an ubuntu 18.04 instance.
-
-    """
-
-    try:
-        vm.ensure_is_ready()
-
-        lxc.launch("images", image, name)
-
-    except YurtException as e:
-        logging.error(e.message)
-
-
-@main.command()
-@click.argument("instances", metavar="<instance>...", nargs=-1)
-def start(instances):
-    """
-    Start a 'Stopped' instance.
-    """
-
-    full_help_if_missing(instances)
-
-    try:
-        vm.ensure_is_ready()
-
-        lxc.start(list(instances))
-
-    except YurtException as e:
-        logging.error(e.message)
-
-
-@main.command()
-@click.argument("instances", metavar="<instance>...", nargs=-1)
-def stop(instances):
-    """
-    Stop an instance.
-    """
-
-    full_help_if_missing(instances)
-
-    try:
-        vm.ensure_is_ready()
-
-        click.echo(lxc.stop(list(instances)))
-
-    except YurtException as e:
-        logging.error(e.message)
-
-
-@main.command()
-@click.argument("instances", metavar="<instance>...", nargs=-1)
-def delete(instances):
-    """
-    Delete an instance.
-    """
-
-    full_help_if_missing(instances)
-
-    try:
-        vm.ensure_is_ready()
-
-        lxc.delete(list(instances))
-
-    except YurtException as e:
-        logging.error(e.message)
-
-
-@main.command()
+@vm_.command()
 def info():
     """
     Show information about the Yurt VM.
@@ -262,10 +198,103 @@ def info():
         logging.error(e.message)
 
 
+# Instances #############################################################
+
+
+@main.command()
+@click.argument("image", metavar="<image>")
+@click.argument("name")
+def launch(image, name):
+    """
+    Create and start a container.
+
+    \b
+    <image>     -   Image to use as source. e.g. ubuntu/18.04 or alpine/3.11.
+                    Only images in https://images.linuxcontainers.org
+                    are supported at this time. Run 'yurt images' to list them.
+    NAME        -   Container name
+
+    \b
+    Container names must:
+    * be between 1 and 63 characters long
+    * be made up exclusively of letters, numbers and dashes from the ASCII table
+    * not start with a digit or a dash
+    * not end with a dash
+
+    EXAMPLES:
+
+    \b
+    $ yurt launch ubuntu/18.04 c1       -   Create and start an ubuntu 18.04 container.
+
+    """
+
+    try:
+        vm.ensure_is_ready()
+
+        lxc.launch("images", image, name)
+
+    except YurtException as e:
+        logging.error(e.message)
+
+
+@main.command()
+@click.argument("instances", metavar="<name>...", nargs=-1)
+def start(instances):
+    """
+    Start one or more containers.
+    """
+
+    full_help_if_missing(instances)
+
+    try:
+        vm.ensure_is_ready()
+
+        lxc.start(list(instances))
+
+    except YurtException as e:
+        logging.error(e.message)
+
+
+@main.command()
+@click.argument("instances", metavar="<name>...", nargs=-1)
+def stop(instances):
+    """
+    Stop one or more containers.
+    """
+
+    full_help_if_missing(instances)
+
+    try:
+        vm.ensure_is_ready()
+
+        click.echo(lxc.stop(list(instances)))
+
+    except YurtException as e:
+        logging.error(e.message)
+
+
+@main.command()
+@click.argument("instances", metavar="<name>...", nargs=-1)
+def delete(instances):
+    """
+    Delete one or more containers.
+    """
+
+    full_help_if_missing(instances)
+
+    try:
+        vm.ensure_is_ready()
+
+        lxc.delete(list(instances))
+
+    except YurtException as e:
+        logging.error(e.message)
+
+
 @main.command(name="list")
 def list_():
     """
-    List instances.
+    List containers.
     """
 
     try:
@@ -276,21 +305,21 @@ def list_():
             click.echo(instances)
         else:
             click.echo(
-                "No instances found. Create one with 'yurt launch <image> <name>'")
+                "No containers found. Create one with 'yurt launch <image> <name>'")
 
     except YurtException as e:
         logging.error(e.message)
 
 
 @main.command()
-@click.argument("instance", metavar="<instance>")
+@click.argument("instance", metavar="<name>")
 def shell(instance):
     """
-    Start a shell in an instance.
+    Start a shell in a container as root.
 
-    This is intended for bootstrapping your instances. It starts a shell
-    as root in <instance>.
-    Use it to create and configure users who can SSH using the instance's
+    The interactive terminal launched is not very sophisticated and is intended for
+    bootstrapping your container. It starts a shell as root in <name>.
+    Use it to create and configure users who can SSH using the container's
     IP address.
     """
 
@@ -305,7 +334,7 @@ def shell(instance):
 @click.option("-r", "--remote", is_flag=True, help="List remote images. Only images at https://images.linuxcontainers.org are supported at this time.")
 def images(remote):
     """
-    List images that can be used to launch containers.
+    List images that can be used to launch a container.
 
     """
 

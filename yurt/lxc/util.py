@@ -43,7 +43,7 @@ def get_pylxd_client():
     except pylxd.exceptions.ClientConnectionFailed as e:
         logging.debug(e)
         raise LXCException(
-            "Error connecting to LXD. Try rebooting the VM: 'yurt reboot'")
+            "Error connecting to LXD. Try restarting the VM: 'yurt vm restart'")
 
 
 def get_instance(name: str):
@@ -111,7 +111,7 @@ def initialize_lxd():
         config.set_config(config.Key.is_lxd_initialized, True)
     except VMException as e:
         logging.error(e)
-        logging.error("Restart the VM to try again: 'yurt reboot'")
+        logging.error("Restart the VM to try again: 'yurt vm restart'")
         raise LXCException("Failed to initialize LXD.")
 
 

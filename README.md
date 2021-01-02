@@ -59,34 +59,25 @@ This downloads and imports a virtual appliance file and may take a few minutes t
 We also install a network interface on your host to allow for direct communication with containers. Accept the User Account Control prompt from VirtualBox when it comes up. Initialization will fail if VirtualBox is denied permission.
 
 
-After initialization, yurt will ask if you want to boot the VM. Respond with 'yes' to start the boot process.
-You can also start it later with `yurt boot`.
-
-
 That's all. You are now ready to launch some containers. At this time we support amd64 images from https://images.linuxcontainers.org/ only. Run `yurt images --remote` to view them.
 
 ```
-$ yurt launch alpine/3.11 instance1
-$ yurt launch ubuntu/18.04 instance2
+$ yurt launch alpine/3.11 c1
+$ yurt launch ubuntu/18.04 c2
 $ yurt list
 
 Name       Status    IP Address       Image
 ---------  --------  ---------------  -------------------
-instance1  Running   192.168.132.117  Alpine/3.11 (amd64)
-instance2  Running   192.168.132.92   Ubuntu/bionic (amd64)
+c1  Running   192.168.132.117  Alpine/3.11 (amd64)
+c2  Running   192.168.132.92   Ubuntu/bionic (amd64)
 
 ```
 
-Run `yurt launch --help` for more information about launching containers and `yurt --help` to explore other commands.
+After launching, start a shell in the container with `yurt shell <name>` . The terminal launched by this command is not very sophisticated 
+so it's best to configure a user to SSH with.
 
-After launching, run `yurt shell <instance> ` to proceed with configuration as you would with any other server.
-At this point, it's best to create and configure a user to SSH with.
 
-```
-$ yurt shell instance1
-root@instance1:~ #
-```
-
+See `yurt -h` for more information about the CLI.
 
 ## Contributing
 
