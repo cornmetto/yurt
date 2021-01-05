@@ -5,7 +5,7 @@ from .vm import (
     ensure_is_ready,
     info,
     init,
-    ssh,
+    launch_ssh,
     start,
     state,
     stop,
