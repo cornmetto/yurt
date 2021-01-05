@@ -40,8 +40,8 @@ else:
 
 
 YURT_ENV = os.environ.get("YURT_ENV", "")
-_app_dir_name = f"{app_name}-{YURT_ENV}"
-
+_sep = "-" if YURT_ENV else ""
+_app_dir_name = f"{app_name}{_sep}{YURT_ENV}"
 
 try:
     if system == System.windows:
