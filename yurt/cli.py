@@ -109,7 +109,7 @@ def ssh():
     """
     try:
         vm.ensure_is_ready()
-        vm.ssh()
+        vm.launch_ssh()
     except YurtException as e:
         logging.error(e.message)
 

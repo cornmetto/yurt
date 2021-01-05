@@ -246,7 +246,7 @@ def run_cmd(cmd: str, show_spinner: bool = False, stdin=None):
         return ssh.run_cmd(cmd, stdin=stdin)
 
 
-def ssh():
+def launch_ssh():
     import subprocess
 
     ssh_port = config.get_config(config.Key.ssh_port)
