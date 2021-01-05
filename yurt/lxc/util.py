@@ -204,11 +204,11 @@ def get_remote_image_info(remote: str, image: Dict):
         logging.debug(f"Unexpected image schema: {image}")
 
 
-def exec_interactive(instance_name: str, cmd: List[str]):
+def exec_interactive(instance_name: str, cmd: List[str], environment=None):
     from . import term
 
     instance = get_instance(instance_name)
-    response = instance.raw_interactive_execute(cmd)
+    response = instance.raw_interactive_execute(cmd, environment=environment)
     lxd_port = config.get_config(config.Key.lxd_port)
     try:
 
