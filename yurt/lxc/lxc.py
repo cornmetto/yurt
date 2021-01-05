@@ -139,7 +139,9 @@ def exec_(instance_name: str, cmd: List[str]):
 
 
 def shell(instance_name: str):
-    util.exec_interactive(instance_name, ["su", "root"])
+    util.exec_interactive(instance_name, ["su", "root"], environment={
+        "PS1": r"\[\033[01;32m\]\u@\h\[\033[00m\]:\[\033[01;34m\]\w\[\033[00m\] \# "
+    })
 
 
 def list_remote_images(remote: str):
