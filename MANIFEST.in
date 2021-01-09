@@ -1,3 +1,5 @@
 include yurt/provision/id_rsa
 include yurt/provision/id_rsa.pub
+include yurt/provision/lxd-init.yaml
 include yurt/provision/yurt-config.vmdk
+include yurt/provision/yurt-lxd-socat.service
